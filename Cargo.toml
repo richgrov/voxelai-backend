@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 flate2 = "1.0.22"
 rand = "0.8.4"
+rlua = "0.19.4"
+strum = "0.24.1"
+strum_macros = "0.24.3"

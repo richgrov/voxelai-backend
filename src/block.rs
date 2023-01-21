@@ -1,6 +1,11 @@
+use std::collections::HashMap;
+
+use strum::IntoEnumIterator;
+use strum_macros::{IntoStaticStr, EnumIter};
+
 #[allow(dead_code, non_camel_case_types)]
-#[derive(Clone, Copy)]
 #[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Debug, IntoStaticStr, EnumIter)]
 pub enum Material {
     air,
     stone,
@@ -240,6 +245,37 @@ pub enum Material {
     structure_block,
 }
 
+static mut STR_TO_MATERIAL: Option<HashMap<&'static str, Material>> = None;
+
+impl Material {
+    pub unsafe fn init_string_map() {
+        assert!(STR_TO_MATERIAL.is_none(), "str_to_material already initialized");
+
+        let mut map = HashMap::new();
+        for mat in Material::iter() {
+            map.insert(mat.into(), mat);
+        }
+
+        STR_TO_MATERIAL = Some(map);
+    }
+}
+
+impl TryFrom<&str> for Material {
+    type Error = Box<dyn std::error::Error>;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        unsafe {
+            match &STR_TO_MATERIAL {
+                Some(map) => match map.get(value) {
+                    Some(mat) => Ok(*mat),
+                    None => Err(format!("Material {} not found", value).into()),
+                },
+                None => panic!("str_to_material not initialized"),
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct Block {
     material: Material,
@@ -267,10 +303,24 @@ impl Block {
 mod tests {
     use std::mem::size_of;
 
+    use strum::IntoEnumIterator;
+
     use crate::block::Block;
+
+    use super::Material;
 
     #[test]
     fn test_block_size() {
         assert_eq!(size_of::<Block>(), 2);
+    }
+
+    #[test]
+    fn test_str_to_material() {
+        unsafe { Material::init_string_map(); }
+
+        for mat in Material::iter() {
+            let mat_str: &'static str = mat.into();
+            assert_eq!(mat, Material::try_from(mat_str).unwrap());
+        }
     }
 }

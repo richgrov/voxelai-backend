@@ -1,23 +1,27 @@
 mod block;
-mod schematic;
 mod nbt;
+mod schematic;
+mod scripting;
 
 use std::fs::File;
 
-use block::{Block, Material};
+use block::Material;
+use rlua::{Lua, StdLib, AnyUserData};
 use schematic::Schematic;
+use scripting::LuaInit;
 
 fn main() {
-    let mut schem = Schematic::new(255, 100, 255);
-    for x in 0..schem.x_size() {
-        for y in 0..schem.y_size() {
-            for z in 0..schem.z_size() {
-                if rand::random::<bool>() {
-                    schem.set_block(x, y, z, Block::new(Material::stone))
-                }
-            }
-        }
-    }
+    unsafe { Material::init_string_map(); }
 
-    schem.serialize(&mut File::create("test.schem").unwrap());
+    let lua = Lua::new_with(StdLib::MATH);
+
+    lua.context(|ctx| {
+        Schematic::initialize_lua(ctx).unwrap();
+
+        let data: AnyUserData = ctx.load(&std::fs::read_to_string("script.lua").unwrap())
+            .eval().unwrap();
+        
+        let schem = data.borrow::<Schematic>().unwrap();
+        schem.serialize(&mut File::create("test.schem").unwrap());
+    });
 }

@@ -1,7 +1,9 @@
 use std::io::Write;
 
 use crate::block::{Block, Material};
+use crate::lua_err;
 use crate::nbt::NbtWriter;
+use crate::scripting::LuaInit;
 
 pub struct Schematic {
     x_size: u8,
@@ -23,13 +25,22 @@ impl Schematic {
         }
     }
 
-    pub fn set_block(&mut self, x: u8, y: u8, z: u8, block: Block) {
-        debug_assert!(x < self.x_size, "x={} >= x_size={}", x, self.x_size);
-        debug_assert!(y < self.y_size, "y={} >= y_size={}", y, self.y_size);
-        debug_assert!(z < self.z_size, "z={} >= z_size={}", z, self.z_size);
+    pub fn set_block(&mut self, x: u8, y: u8, z: u8, block: Block) -> Result<(), rlua::Error> {
+        if x >= self.x_size() {
+            lua_err!("x={} >= x_size={}", x, self.x_size())
+        }
+
+        if y >= self.y_size() {
+            lua_err!("y={} >= y_size={}", x, self.x_size())
+        }
+
+        if z >= self.z_size() {
+            lua_err!("z={} >= z_size={}", x, self.x_size())
+        }
 
         let index = (y as usize * self.z_size as usize + z as usize) * self.x_size as usize + x as usize;
         self.blocks[index] = block;
+        Ok(())
     }
 
     pub fn x_size(&self) -> u8 {
@@ -67,5 +78,28 @@ impl Schematic {
 
         nbt.end_compound();
         nbt.finish();
+    }
+}
+
+impl LuaInit for Schematic {
+    fn initialize_lua(ctx: rlua::Context) -> Result<(), rlua::Error> {
+        let ctor = ctx.create_function(|_, (x_size, y_size, z_size): (u8, u8, u8)| {
+            Ok(Schematic::new(x_size, y_size, z_size))
+        })?;
+
+        ctx.globals().set("Schematic", ctor)
+    }
+}
+
+impl rlua::UserData for Schematic {
+    fn add_methods<'lua, T: rlua::UserDataMethods<'lua, Self>>(methods: &mut T) {
+        methods.add_method_mut("Set", move |_, schematic, (x, y, z, material): (_, _, _, String)| {
+            let block = match Material::try_from(material.as_str()) {
+                Ok(m) => Block::new(m),
+                Err(_) => lua_err!("material {} not found", material)
+            };
+
+            schematic.set_block(x, y, z, block)
+        });
     }
 }
