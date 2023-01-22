@@ -26,6 +26,18 @@ impl Schematic {
     }
 
     pub fn set_block(&mut self, x: u8, y: u8, z: u8, block: Block) -> Result<(), rlua::Error> {
+        let index = self.get_index(x, y, z)?;
+        self.blocks[index] = block;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn get_block(&self, x: u8, y: u8, z: u8) -> Result<Block, rlua::Error> {
+        let index = self.get_index(x, y, z)?;
+        Ok(self.blocks[index])
+    }
+
+    fn get_index(&self, x: u8, y: u8, z: u8) -> Result<usize, rlua::Error> {
         if x == 0 || x > self.x_size() {
             lua_err!("invalid x {}", x)
         }
@@ -38,9 +50,7 @@ impl Schematic {
             lua_err!("invalid z {}", z)
         }
 
-        let index = ((y - 1) as usize * self.z_size as usize + (z - 1) as usize) * self.x_size as usize + (x - 1) as usize;
-        self.blocks[index] = block;
-        Ok(())
+        Ok(((y - 1) as usize * self.z_size as usize + (z - 1) as usize) * self.x_size as usize + (x - 1) as usize)
     }
 
     pub fn x_size(&self) -> u8 {
@@ -113,5 +123,22 @@ impl rlua::UserData for Schematic {
         methods.add_method("zSize", |_, schematic, ()| {
             Ok(schematic.z_size())
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::block::{Block, Material};
+
+    use super::Schematic;
+
+    #[test]
+    fn test_coordinates() {
+        let mut schem = Schematic::new(10, 10, 10);
+        schem.set_block(1, 1, 1, Block::new(Material::anvil)).unwrap();
+        schem.set_block(10, 10, 10, Block::new(Material::beacon)).unwrap();
+
+        assert_eq!(schem.get_block(1, 1, 1).unwrap(), Block::new(Material::anvil)); 
+        assert_eq!(schem.get_block(10, 10, 10).unwrap(), Block::new(Material::beacon)); 
     }
 }
