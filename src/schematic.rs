@@ -37,6 +37,20 @@ impl Schematic {
         Ok(self.blocks[index])
     }
 
+    pub fn fill(
+        &mut self, x1: u8, y1: u8, z1: u8, x2: u8, y2: u8, z2: u8, block: Block
+    ) -> Result<(), rlua::Error> {
+        for x in x1..=x2 {
+            for y in y1..=y2 {
+                for z in z1..=z2 {
+                    self.set_block(x, y, z, block)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     fn get_index(&self, x: u8, y: u8, z: u8) -> Result<usize, rlua::Error> {
         if x == 0 || x > self.x_size() {
             lua_err!("invalid x {}", x)
@@ -112,6 +126,17 @@ impl rlua::UserData for Schematic {
             schematic.set_block(x, y, z, block)
         });
 
+        methods.add_method_mut("Fill",
+            |_, schematic, (x1, y1, z1, x2, y2, z2, material): (_, _, _, _, _, _, String)| {
+                let block = match Material::try_from(material.as_str()) {
+                    Ok(m) => Block::new(m),
+                    Err(_) => lua_err!("material {} not found", material)
+                };
+    
+                schematic.fill(x1, y1, z1, x2, y2, z2, block)
+            }
+        );
+
         methods.add_method("xSize", |_, schematic, ()| {
             Ok(schematic.x_size())
         });
@@ -140,5 +165,27 @@ mod tests {
 
         assert_eq!(schem.get_block(1, 1, 1).unwrap(), Block::new(Material::anvil)); 
         assert_eq!(schem.get_block(10, 10, 10).unwrap(), Block::new(Material::beacon)); 
+    }
+
+    #[test]
+    fn test_fill() {
+        let mut schem = Schematic::new(10, 10, 10);
+        schem.fill(1, 2, 3, 7, 8, 9, Block::new(Material::anvil)).unwrap();
+
+        for x in 1..=schem.x_size() {
+            for y in 1..=schem.y_size() {
+                for z in 1..=schem.z_size() {
+                    let expected = if (1..=7).contains(&x) &&
+                                      (2..=8).contains(&y) &&
+                                      (3..=9).contains(&z) {
+                        Block::new(Material::anvil)
+                    } else {
+                        Block::new(Material::air)
+                    };
+
+                    assert_eq!(schem.get_block(x, y, z).unwrap(), expected);
+                }
+            }
+        }
     }
 }
