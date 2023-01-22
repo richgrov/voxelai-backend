@@ -101,5 +101,17 @@ impl rlua::UserData for Schematic {
 
             schematic.set_block(x, y, z, block)
         });
+
+        methods.add_method("xSize", |_, schematic, ()| {
+            Ok(schematic.x_size())
+        });
+
+        methods.add_method("ySize", |_, schematic, ()| {
+            Ok(schematic.y_size())
+        });
+
+        methods.add_method("zSize", |_, schematic, ()| {
+            Ok(schematic.z_size())
+        });
     }
 }
