@@ -117,19 +117,32 @@ impl LuaInit for Schematic {
 
 impl rlua::UserData for Schematic {
     fn add_methods<'lua, T: rlua::UserDataMethods<'lua, Self>>(methods: &mut T) {
-        methods.add_method_mut("Set", |_, schematic, (x, y, z, material): (_, _, _, String)| {
+        methods.add_method_mut("Set", |
+            _,
+            schematic,
+            (x, y, z, material, data): (_, _, _, String, Option<u8>)
+        | {
             let block = match Material::try_from(material.as_str()) {
-                Ok(m) => Block::new(m),
+                Ok(m) => match data {
+                    Some(d) => Block::new_with_data(m, d),
+                    None => Block::new(m),
+                },
                 Err(_) => lua_err!("material {} not found", material)
             };
 
             schematic.set_block(x, y, z, block)
         });
 
-        methods.add_method_mut("Fill",
-            |_, schematic, (x1, y1, z1, x2, y2, z2, material): (_, _, _, _, _, _, String)| {
+        methods.add_method_mut("Fill", |
+            _,
+            schematic,
+            (x1, y1, z1, x2, y2, z2, material, data): (_, _, _, _, _, _, String, Option<u8>)
+        | {
                 let block = match Material::try_from(material.as_str()) {
-                    Ok(m) => Block::new(m),
+                    Ok(m) => match data {
+                        Some(d) => Block::new_with_data(m, d),
+                        None => Block::new(m),
+                    },
                     Err(_) => lua_err!("material {} not found", material)
                 };
     

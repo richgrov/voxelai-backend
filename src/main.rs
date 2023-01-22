@@ -10,6 +10,8 @@ use rlua::{Lua, StdLib, AnyUserData};
 use schematic::Schematic;
 use scripting::LuaInit;
 
+use crate::block::BlockData;
+
 fn main() {
     unsafe { Material::init_string_map(); }
 
@@ -17,6 +19,7 @@ fn main() {
 
     lua.context(|ctx| {
         Schematic::initialize_lua(ctx).unwrap();
+        BlockData::initialize_lua(ctx).unwrap();
 
         let data: AnyUserData = ctx.load(&std::fs::read_to_string("script.lua").unwrap())
             .eval().unwrap();

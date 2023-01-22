@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use strum::IntoEnumIterator;
 use strum_macros::{IntoStaticStr, EnumIter};
 
+use crate::scripting::LuaInit;
+
 #[allow(dead_code, non_camel_case_types)]
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Debug, IntoStaticStr, EnumIter)]
@@ -308,12 +310,49 @@ impl Block {
         }
     }
 
+    pub fn new_with_data(material: Material, data: u8) -> Block {
+        Block {
+            material,
+            data,
+        }
+    }
+
     pub fn material(self) -> Material {
         self.material
     }
 
     pub fn data(self) -> u8 {
         self.data
+    }
+}
+
+pub struct BlockData;
+
+impl LuaInit for BlockData {
+    fn initialize_lua(ctx: rlua::Context) -> Result<(), rlua::Error> {
+        let table = ctx.create_table()?;
+        
+        let color = ctx.create_table()?;
+        color.set("White", 0)?;
+        color.set("Orange", 1)?;
+        color.set("Magenta", 2)?;
+        color.set("LightBlue", 3)?;
+        color.set("Yellow", 4)?;
+        color.set("Lime", 5)?;
+        color.set("Pink", 6)?;
+        color.set("Gray", 7)?;
+        color.set("LightGray", 8)?;
+        color.set("Cyan", 9)?;
+        color.set("Purple", 10)?;
+        color.set("Blue", 11)?;
+        color.set("Brown", 12)?;
+        color.set("Green", 13)?;
+        color.set("Red", 14)?;
+        color.set("Black", 15)?;
+        table.set("Color", color)?;
+
+        ctx.globals().set("BlockData", table)?;
+        Ok(())
     }
 }
 
