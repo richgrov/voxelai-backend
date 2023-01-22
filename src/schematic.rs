@@ -26,19 +26,19 @@ impl Schematic {
     }
 
     pub fn set_block(&mut self, x: u8, y: u8, z: u8, block: Block) -> Result<(), rlua::Error> {
-        if x >= self.x_size() {
-            lua_err!("x={} >= x_size={}", x, self.x_size())
+        if x == 0 || x > self.x_size() {
+            lua_err!("invalid x {}", x)
         }
 
-        if y >= self.y_size() {
-            lua_err!("y={} >= y_size={}", x, self.x_size())
+        if y == 0 || y > self.y_size() {
+            lua_err!("invalid y {}", y)
         }
 
-        if z >= self.z_size() {
-            lua_err!("z={} >= z_size={}", x, self.x_size())
+        if z == 0 || z > self.z_size() {
+            lua_err!("invalid z {}", z)
         }
 
-        let index = (y as usize * self.z_size as usize + z as usize) * self.x_size as usize + x as usize;
+        let index = ((y - 1) as usize * self.z_size as usize + (z - 1) as usize) * self.x_size as usize + (x - 1) as usize;
         self.blocks[index] = block;
         Ok(())
     }
