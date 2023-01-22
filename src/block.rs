@@ -276,7 +276,7 @@ impl TryFrom<&str> for Material {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Block {
     material: Material,
     data: u8,
