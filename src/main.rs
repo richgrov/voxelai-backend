@@ -1,5 +1,6 @@
 mod block;
 mod nbt;
+mod nlp;
 mod schematic;
 mod scripting;
 
@@ -12,8 +13,13 @@ use scripting::LuaInit;
 
 use crate::block::BlockData;
 
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
     unsafe { Material::init_string_map(); }
+    let key = std::env::var("OPENAI_API_KEY").unwrap();
+    let prompt = "A cylinder with a radius of 5 and a height of 15 where every layer is stone and every other layer is tnt";
+
+    let script = nlp::generate(&key, prompt).await.unwrap();
 
     let lua = Lua::new_with(StdLib::MATH);
 
@@ -21,7 +27,7 @@ fn main() {
         Schematic::initialize_lua(ctx).unwrap();
         BlockData::initialize_lua(ctx).unwrap();
 
-        let data: AnyUserData = ctx.load(&std::fs::read_to_string("script.lua").unwrap())
+        let data: AnyUserData = ctx.load(&script)
             .eval().unwrap();
         
         let schem = data.borrow::<Schematic>().unwrap();
