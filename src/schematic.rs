@@ -52,19 +52,19 @@ impl Schematic {
     }
 
     fn get_index(&self, x: u8, y: u8, z: u8) -> Result<usize, rlua::Error> {
-        if x == 0 || x > self.x_size() {
+        if x >= self.x_size() {
             lua_err!("invalid x {}", x)
         }
 
-        if y == 0 || y > self.y_size() {
+        if y >= self.y_size() {
             lua_err!("invalid y {}", y)
         }
 
-        if z == 0 || z > self.z_size() {
+        if z >= self.z_size() {
             lua_err!("invalid z {}", z)
         }
 
-        Ok(((y - 1) as usize * self.z_size as usize + (z - 1) as usize) * self.x_size as usize + (x - 1) as usize)
+        Ok((y as usize * self.z_size as usize + z as usize) * self.x_size as usize + x as usize)
     }
 
     pub fn x_size(&self) -> u8 {
@@ -173,25 +173,25 @@ mod tests {
     #[test]
     fn test_coordinates() {
         let mut schem = Schematic::new(10, 10, 10);
-        schem.set_block(1, 1, 1, Block::new(Material::anvil)).unwrap();
-        schem.set_block(10, 10, 10, Block::new(Material::beacon)).unwrap();
+        schem.set_block(0, 0, 0, Block::new(Material::cactus)).unwrap();
+        schem.set_block(9, 9, 9, Block::new(Material::bedrock)).unwrap();
 
-        assert_eq!(schem.get_block(1, 1, 1).unwrap(), Block::new(Material::anvil)); 
-        assert_eq!(schem.get_block(10, 10, 10).unwrap(), Block::new(Material::beacon)); 
+        assert_eq!(schem.get_block(0, 0, 0).unwrap(), Block::new(Material::cactus)); 
+        assert_eq!(schem.get_block(9, 9, 9).unwrap(), Block::new(Material::bedrock)); 
     }
 
     #[test]
     fn test_fill() {
         let mut schem = Schematic::new(10, 10, 10);
-        schem.fill(1, 2, 3, 7, 8, 9, Block::new(Material::anvil)).unwrap();
+        schem.fill(1, 2, 3, 7, 8, 9, Block::new(Material::bedrock)).unwrap();
 
-        for x in 1..=schem.x_size() {
-            for y in 1..=schem.y_size() {
-                for z in 1..=schem.z_size() {
+        for x in 0..schem.x_size() {
+            for y in 0..schem.y_size() {
+                for z in 0..schem.z_size() {
                     let expected = if (1..=7).contains(&x) &&
                                       (2..=8).contains(&y) &&
                                       (3..=9).contains(&z) {
-                        Block::new(Material::anvil)
+                        Block::new(Material::bedrock)
                     } else {
                         Block::new(Material::air)
                     };
