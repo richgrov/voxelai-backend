@@ -1,2 +1,4 @@
 /target
 *.schem
+*-debug.log
+.firebaserc
