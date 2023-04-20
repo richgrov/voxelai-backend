@@ -15,7 +15,12 @@ const generationEndpoint = defineString('GENERATION_ENDPOINT');
 const storageBucket = defineString('STORAGE_BUCKET');
 
 export const generate = functions.https.onCall(async data => {
-	const prompt = data.prompt;
+	const prompt = data?.prompt;
+	if (typeof prompt !== 'string') {
+		throw new functions.https.HttpsError(
+			'invalid-argument', 'prompt is invalid or not present'
+		);
+	}
 
 	const job = jobs.doc();
 	await job.set({
@@ -50,10 +55,12 @@ export const generatePubSub = functions.pubsub
 				.file(jobId + '.schematic');
 
 			const stream = response.data.pipe(storage.createWriteStream());
-			stream.on('error', console.error);
 			stream.on('finish', () => job.update({ status: 'finished' }));
+			stream.on('error', e => {
+				throw e;
+			});
 		} catch (err) {
-			console.error(err);
 			jobs.doc(jobId).update({ status: 'failed' });
+			throw err;
 		}
 	});
