@@ -30,6 +30,7 @@ module.exports = {
 		'no-tabs': ['error', { allowIndentationTabs: true }],
 		'object-curly-spacing': ['error', 'always'],
 		'arrow-parens': ['error', 'as-needed'],
+		'max-len': ['error', { code: 100 }],
 		'import/no-unresolved': 0,
 	},
 };
