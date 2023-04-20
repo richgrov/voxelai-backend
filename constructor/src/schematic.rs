@@ -5,6 +5,7 @@ use crate::lua_err;
 use crate::nbt::NbtWriter;
 use crate::scripting::LuaInit;
 
+#[derive(Clone)]
 pub struct Schematic {
     x_size: u8,
     y_size: u8,
