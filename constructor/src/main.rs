@@ -4,6 +4,8 @@ mod nlp;
 mod schematic;
 mod scripting;
 
+use std::net::Ipv4Addr;
+
 use block::Material;
 use rlua::{Lua, StdLib};
 use rocket::{State, post, routes};
@@ -30,6 +32,7 @@ async fn main() {
     let openai_key = std::env::var("OPENAI_API_KEY").expect("Environment variable OPENAI_API_KEY is not set");
 
     let config = rocket::Config {
+        address: std::net::IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
         port,
         ..rocket::Config::release_default()
     };
