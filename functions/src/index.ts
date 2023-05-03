@@ -38,7 +38,11 @@ export const generate = functions.https.onCall(async data => {
 	return { jobId: job.id };
 });
 
-export const generatePubSub = functions.pubsub
+export const generatePubSub = functions
+	.runWith({
+		timeoutSeconds: 120,
+	})
+	.pubsub
 	.topic('generation')
 	.onPublish(async message => {
 		const { prompt, jobId } = message.json;
