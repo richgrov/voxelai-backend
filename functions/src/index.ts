@@ -73,15 +73,16 @@ export const generatePubSub = functions
  * Running in production, the request will be authenticated with IAM.
  */
 async function generateAndGetStream(prompt: string): Promise<Stream> {
-	const url = new URL(`/generate?prompt=${encodeURIComponent(prompt)}`, generationEndpoint.value());
+	const promptEncoded = encodeURIComponent(prompt);
+	const url = new URL(`/generate?prompt=${promptEncoded}`, generationEndpoint.value());
 
 	if (process.env.FUNCTIONS_EMULATOR === 'true') {
-		return axios({ url: url.href, method: 'POST', responseType: 'stream'})
+		return axios({ url: url.href, method: 'POST', responseType: 'stream' })
 			.then(response => response.data);
 	} else {
 		const client = await auth.getIdTokenClient(generationEndpoint.value());
 
-		return client.request({ url: url.href, method: 'POST', responseType: 'stream'})
+		return client.request({ url: url.href, method: 'POST', responseType: 'stream' })
 			.then(response => response.data as Stream);
 	}
 }

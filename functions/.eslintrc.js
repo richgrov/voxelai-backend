@@ -32,5 +32,6 @@ module.exports = {
 		'arrow-parens': ['error', 'as-needed'],
 		'max-len': ['error', { code: 100 }],
 		'import/no-unresolved': 0,
+		'valid-jsdoc': ['off'],
 	},
 };
