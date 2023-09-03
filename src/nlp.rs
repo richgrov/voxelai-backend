@@ -135,7 +135,7 @@ struct Message {
     content: String,
 }
 
-pub async fn generate(key: &str, prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn generate(key: &str, prompt: &str) -> Result<String, reqwest::Error> {
     let client = reqwest::Client::new();
     let response = client.post("https://api.openai.com/v1/chat/completions")
         .json(&json!({
@@ -151,7 +151,7 @@ pub async fn generate(key: &str, prompt: &str) -> Result<String, Box<dyn std::er
         .send().await?
         .json::<Response>().await?;
 
-    println!("{:?}", response);
+    println!("{:?}", response.choices);
 
     let response = &response.choices[0].message.content;
     let code = match response.strip_prefix("```lua") {
