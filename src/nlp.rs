@@ -152,5 +152,12 @@ pub async fn generate(key: &str, prompt: &str) -> Result<String, Box<dyn std::er
         .json::<Response>().await?;
 
     println!("{:?}", response);
-    Ok(response.choices[0].message.content.clone())
+
+    let response = &response.choices[0].message.content;
+    let code = match response.strip_prefix("```lua") {
+        Some(str) => str[..str.len() - 3].to_owned(),
+        None => response.to_owned(),
+    };
+
+    Ok(code)
 }
