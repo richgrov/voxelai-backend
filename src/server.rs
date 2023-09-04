@@ -1,10 +1,11 @@
 use rlua::{StdLib, Lua};
-use rocket::{routes, State, post};
+use rocket::{routes, State, post, async_trait};
 
 use crate::{nlp, schematic::Schematic, scripting::LuaInit, block::BlockData};
 
+#[async_trait]
 pub trait ObjectStorage: Send + Sync {
-    fn put(&self, id: &str, data: &[u8]) -> Result<String, Box<dyn std::error::Error>>;
+    async fn put(&self, id: &str, data: &[u8]) -> Result<String, Box<dyn std::error::Error>>;
 }
 
 struct Server {
@@ -45,7 +46,7 @@ async fn generate(server: &State<Server>, id: &str, prompt: &str) -> Result<Stri
     let mut data = Vec::with_capacity(256);
     schem.serialize(&mut data);
 
-    server.object_storage.put(id, &data)
+    server.object_storage.put(id, &data).await
         .map_err(|e| ErrorResponse::Internal(e.to_string()))
 }
 

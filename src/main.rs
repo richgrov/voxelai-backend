@@ -1,4 +1,5 @@
 mod block;
+mod cloudflare_r2;
 mod nbt;
 mod nlp;
 mod schematic;
@@ -6,6 +7,8 @@ mod scripting;
 mod server;
 
 use block::Material;
+use cloudflare_r2::CloudflareR2Storage;
+use rocket::async_trait;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -17,12 +20,24 @@ async fn main() {
         ..rocket::Config::release_default()
     };
 
-    let openai_key = std::env::var("OPENAI_API_KEY")
-        .expect("Environment variable OPENAI_API_KEY is not set");
+    let openai_key = expect_env("OPENAI_API_KEY");
 
-    let storage = FileSystemStorage;
+    let storage: Box<dyn server::ObjectStorage> = if std::env::var("FILE_SYSTEM_STORAGE").is_ok() {
+        Box::new(FileSystemStorage)
+    } else {
+        let bucket_name = expect_env("R2_BUCKET_NAME");
+        let account_id = expect_env("R2_ACCOUNT_ID");
+        let public_url = expect_env("R2_PUBLIC_URL");
 
-    server::run(config, openai_key, Box::new(storage)).await;
+        Box::new(CloudflareR2Storage::new(
+            &bucket_name,
+            account_id,
+            s3::creds::Credentials::default().unwrap(), // loads from ENV
+            public_url,
+        ).unwrap())
+    };
+
+    server::run(config, openai_key, storage).await;
 }
 
 fn parse_env<T: std::str::FromStr>(var: &str, default: T) -> T {
@@ -35,10 +50,15 @@ fn parse_env<T: std::str::FromStr>(var: &str, default: T) -> T {
     }
 }
 
+fn expect_env(var: &str) -> String {
+    std::env::var(var).expect(&format!("environment variable {} not set", var))
+}
+
 struct FileSystemStorage;
 
+#[async_trait]
 impl server::ObjectStorage for FileSystemStorage {
-    fn put(&self, id: &str, data: &[u8]) -> Result<String, Box<dyn std::error::Error>> {
+    async fn put(&self, id: &str, data: &[u8]) -> Result<String, Box<dyn std::error::Error>> {
         let path = format!("{}.schem", id);
         std::fs::write(&path, data)?;
         Ok(path)
