@@ -12,6 +12,9 @@ use rocket::async_trait;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    #[cfg(debug_assertions)]
+    dotenvy::from_filename(".env.local").unwrap();
+
     unsafe { Material::init_string_map(); }
 
     let config = rocket::Config {
