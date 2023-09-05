@@ -1,4 +1,4 @@
-app = "constructor"
+app = "constructor-dev"
 primary_region = "sjc"
 
 [http_service]
