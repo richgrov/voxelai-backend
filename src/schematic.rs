@@ -5,7 +5,7 @@ use std::io::Write;
 use gltf::json::accessor::GenericComponentType;
 use gltf::json::validation::Checked;
 
-use crate::block::{Block, Material};
+use crate::color::Color;
 use crate::lua_err;
 use crate::scripting::LuaInit;
 
@@ -14,7 +14,7 @@ pub struct Schematic {
     x_size: u8,
     y_size: u8,
     z_size: u8,
-    blocks: Vec<Block>,
+    blocks: Vec<Color>,
 }
 
 #[derive(Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
@@ -25,37 +25,37 @@ struct Vertex {
 }
 
 impl Schematic {
+    const ABSENT: Color = Color(0);
+
     pub fn new(x_size: u8, y_size: u8, z_size: u8) -> Self {
         let capacity = x_size as usize * y_size as usize * z_size as usize;
-        let air = Block::new(Material::air);
 
         Schematic {
             x_size,
             y_size,
             z_size,
-            blocks: vec![air; capacity],
+            blocks: vec![Color(0); capacity],
         }
     }
 
-    pub fn set_block(&mut self, x: u8, y: u8, z: u8, block: Block) -> Result<(), rlua::Error> {
+    pub fn set(&mut self, x: u8, y: u8, z: u8, color: Color) -> Result<(), rlua::Error> {
         let index = self.get_index(x, y, z)?;
-        self.blocks[index] = block;
+        self.blocks[index] = color;
         Ok(())
     }
 
-    #[cfg(test)]
-    fn get_block(&self, x: u8, y: u8, z: u8) -> Result<Block, rlua::Error> {
+    fn get(&self, x: u8, y: u8, z: u8) -> Result<Color, rlua::Error> {
         let index = self.get_index(x, y, z)?;
         Ok(self.blocks[index])
     }
 
     pub fn fill(
-        &mut self, x1: u8, y1: u8, z1: u8, x2: u8, y2: u8, z2: u8, block: Block
+        &mut self, x1: u8, y1: u8, z1: u8, x2: u8, y2: u8, z2: u8, block: Color
     ) -> Result<(), rlua::Error> {
         for x in x1..=x2 {
             for y in y1..=y2 {
                 for z in z1..=z2 {
-                    self.set_block(x, y, z, block)?;
+                    self.set(x, y, z, block)?;
                 }
             }
         }
@@ -271,35 +271,28 @@ impl rlua::UserData for Schematic {
         methods.add_method_mut("Set", |
             _,
             schematic,
-            (x, y, z, material, data): (_, _, _, String, Option<u8>)
+            (x, y, z, color_str): (_, _, _, String)
         | {
-            let block = match Material::try_from(material.as_str()) {
-                Ok(m) => match data {
-                    Some(d) => Block::new_with_data(m, d),
-                    None => Block::new(m),
-                },
-                Err(_) => lua_err!("material {} not found", material)
+            let color = match Color::try_from_octal_string(&color_str) {
+                Ok(c) => c,
+                Err(_) => lua_err!("color \"{}\" is invalid", color_str),
             };
 
-            schematic.set_block(x, y, z, block)
+            schematic.set(x, y, z, color)
         });
 
         methods.add_method_mut("Fill", |
             _,
             schematic,
-            (x1, y1, z1, x2, y2, z2, material, data): (_, _, _, _, _, _, String, Option<u8>)
+            (x1, y1, z1, x2, y2, z2, color_str): (_, _, _, _, _, _, String)
         | {
-                let block = match Material::try_from(material.as_str()) {
-                    Ok(m) => match data {
-                        Some(d) => Block::new_with_data(m, d),
-                        None => Block::new(m),
-                    },
-                    Err(_) => lua_err!("material {} not found", material)
-                };
+            let color = match Color::try_from_octal_string(&color_str) {
+                Ok(c) => c,
+                Err(_) => lua_err!("color \"{}\" is invalid", color_str),
+            };
     
-                schematic.fill(x1, y1, z1, x2, y2, z2, block)
-            }
-        );
+            schematic.fill(x1, y1, z1, x2, y2, z2, color)
+        });
 
         methods.add_method("xSize", |_, schematic, ()| {
             Ok(schematic.x_size())
@@ -317,24 +310,24 @@ impl rlua::UserData for Schematic {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{Block, Material};
+    use crate::color::Color;
 
     use super::Schematic;
 
     #[test]
     fn test_coordinates() {
         let mut schem = Schematic::new(10, 10, 10);
-        schem.set_block(0, 0, 0, Block::new(Material::cactus)).unwrap();
-        schem.set_block(9, 9, 9, Block::new(Material::bedrock)).unwrap();
+        schem.set(0, 0, 0, Color(0o070)).unwrap();
+        schem.set(9, 9, 9, Color(1)).unwrap();
 
-        assert_eq!(schem.get_block(0, 0, 0).unwrap(), Block::new(Material::cactus)); 
-        assert_eq!(schem.get_block(9, 9, 9).unwrap(), Block::new(Material::bedrock)); 
+        assert_eq!(schem.get(0, 0, 0).unwrap(), Color(0o070)); 
+        assert_eq!(schem.get(9, 9, 9).unwrap(), Color(1)); 
     }
 
     #[test]
     fn test_fill() {
         let mut schem = Schematic::new(10, 10, 10);
-        schem.fill(1, 2, 3, 7, 8, 9, Block::new(Material::bedrock)).unwrap();
+        schem.fill(1, 2, 3, 7, 8, 9, Color(1)).unwrap();
 
         for x in 0..schem.x_size() {
             for y in 0..schem.y_size() {
@@ -342,12 +335,12 @@ mod tests {
                     let expected = if (1..=7).contains(&x) &&
                                       (2..=8).contains(&y) &&
                                       (3..=9).contains(&z) {
-                        Block::new(Material::bedrock)
+                        Color(1)
                     } else {
-                        Block::new(Material::air)
+                        Color(0)
                     };
 
-                    assert_eq!(schem.get_block(x, y, z).unwrap(), expected);
+                    assert_eq!(schem.get(x, y, z).unwrap(), expected);
                 }
             }
         }

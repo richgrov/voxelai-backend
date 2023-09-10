@@ -1,11 +1,10 @@
-mod block;
 mod cloudflare_r2;
+mod color;
 mod nlp;
 mod schematic;
 mod scripting;
 mod server;
 
-use block::Material;
 use cloudflare_r2::CloudflareR2Storage;
 use rocket::async_trait;
 
@@ -13,8 +12,6 @@ use rocket::async_trait;
 async fn main() {
     #[cfg(debug_assertions)]
     dotenvy::from_filename(".env.local").unwrap();
-
-    unsafe { Material::init_string_map(); }
 
     let config = rocket::Config {
         address: parse_env("BIND", "127.0.0.1".parse().unwrap()),

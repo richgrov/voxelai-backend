@@ -1,7 +1,7 @@
 use rlua::{StdLib, Lua};
 use rocket::{routes, State, post, async_trait};
 
-use crate::{nlp, schematic::Schematic, scripting::LuaInit, block::BlockData};
+use crate::{nlp, schematic::Schematic, scripting::LuaInit};
 
 #[async_trait]
 pub trait ObjectStorage: Send + Sync {
@@ -55,8 +55,6 @@ fn build_schematic(lua_src: &str) -> Result<Schematic, rlua::Error> {
 
     lua.context(|ctx| {
         Schematic::initialize_lua(ctx)?;
-        BlockData::initialize_lua(ctx)?;
-
         Ok(ctx.load(&lua_src).eval()?)
     })
 }
