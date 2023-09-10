@@ -1,6 +1,5 @@
 mod block;
 mod cloudflare_r2;
-mod nbt;
 mod nlp;
 mod schematic;
 mod scripting;

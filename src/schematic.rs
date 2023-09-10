@@ -1,8 +1,12 @@
+use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::io::Write;
+
+use gltf::json::accessor::GenericComponentType;
+use gltf::json::validation::Checked;
 
 use crate::block::{Block, Material};
 use crate::lua_err;
-use crate::nbt::NbtWriter;
 use crate::scripting::LuaInit;
 
 #[derive(Clone)]
@@ -11,6 +15,13 @@ pub struct Schematic {
     y_size: u8,
     z_size: u8,
     blocks: Vec<Block>,
+}
+
+#[derive(Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
+#[repr(C)]
+struct Vertex {
+    pos: [f32; 3],
+    color: [f32; 3],
 }
 
 impl Schematic {
@@ -80,29 +91,139 @@ impl Schematic {
         self.z_size
     }
 
-    pub fn serialize<W: Write>(&self, w: &mut W) {
-        let mut nbt = NbtWriter::new(w);
-        nbt.begin_compound("Schematic");
+    pub fn serialize<W: Write>(&self, w: &mut W) -> Result<(), Box<dyn std::error::Error>> {
+        let mut vertices = Vec::new();
+        vertices.extend_from_slice(&[
+            Vertex {
+                pos: [0.0, 0.5, 0.0],
+                color: [1.0, 0.0, 0.0],
+            },
+            Vertex {
+                pos: [-0.5, -0.5, 0.0],
+                color: [0.0, 1.0, 0.0],
+            },
+            Vertex {
+                pos: [0.5, -0.5, 0.0],
+                color: [0.0, 0.0, 1.0],
+            },
+        ]);
 
-        nbt.write_short("Width", self.x_size() as i16);
-        nbt.write_short("Height", self.y_size() as i16);
-        nbt.write_short("Length", self.z_size() as i16);
+        let vertices_bytes = bytemuck::cast_slice(&vertices);
+        let vertices_byte_size = vertices_bytes.len();
 
-        nbt.write_string("Materials", "Alpha");
+        let mut min = [f32::MAX, f32::MAX, f32::MAX];
+        let mut max = [f32::MIN, f32::MIN, f32::MIN];
 
-        let mut block_ids = Vec::<u8>::with_capacity(self.blocks.len());
-        let mut block_data = Vec::<u8>::with_capacity(self.blocks.len());
-
-        for block in &self.blocks {
-            block_ids.push(block.material() as u8);
-            block_data.push(block.data());
+        for vertex in &vertices {
+            for i in 0..3 {
+                min[i] = f32::min(min[i], vertex.pos[i]);
+                max[i] = f32::max(max[i], vertex.pos[i]);
+            }
         }
 
-        nbt.write_byte_array("Blocks", &block_ids);
-        nbt.write_byte_array("Data", &block_data);
+        let json = gltf::json::serialize::to_string(&gltf::json::Root {
+            accessors: vec![
+                gltf::json::Accessor {
+                    buffer_view: Some(gltf::json::Index::new(0)),
+                    byte_offset: Some(0),
+                    count: vertices.len() as u32,
+                    component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::F32)),
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    type_: Checked::Valid(gltf::json::accessor::Type::Vec3),
+                    min: Some(Vec::from(min).into()),
+                    max: Some(Vec::from(max).into()),
+                    name: None,
+                    normalized: false,
+                    sparse: None,
+                },
+                gltf::json::Accessor {
+                    buffer_view: Some(gltf::json::Index::new(0)),
+                    byte_offset: Some((3 * std::mem::size_of::<f32>()) as u32),
+                    count: vertices.len() as u32,
+                    component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::F32)),
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    type_: Checked::Valid(gltf::json::accessor::Type::Vec3),
+                    min: None,
+                    max: None,
+                    name: None,
+                    normalized: false,
+                    sparse: None,
+                },
+            ],
+            buffers: vec![gltf::json::Buffer {
+                byte_length: vertices_byte_size as u32,
+                extensions: Default::default(),
+                extras: Default::default(),
+                name: None,
+                uri: None,
+            }],
+            buffer_views: vec![gltf::json::buffer::View {
+                buffer: gltf::json::Index::new(0),
+                byte_length: vertices_byte_size as u32,
+                byte_offset: None,
+                byte_stride: Some(std::mem::size_of::<Vertex>() as u32),
+                extensions: Default::default(),
+                extras: Default::default(),
+                name: None,
+                target: Some(Checked::Valid(gltf::json::buffer::Target::ArrayBuffer)),
+            }],
+            meshes: vec![gltf::json::Mesh {
+                extensions: Default::default(),
+                extras: Default::default(),
+                name: None,
+                primitives: vec![gltf::json::mesh::Primitive {
+                    attributes: {
+                        let mut map = BTreeMap::new();
+                        map.insert(Checked::Valid(gltf::json::mesh::Semantic::Positions), gltf::json::Index::new(0));
+                        map.insert(Checked::Valid(gltf::json::mesh::Semantic::Colors(0)), gltf::json::Index::new(1));
+                        map
+                    },
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    indices: None,
+                    material: None,
+                    mode: Checked::Valid(gltf::json::mesh::Mode::Triangles),
+                    targets: None,
+                }],
+                weights: None,
+            }],
+            nodes: vec![gltf::json::Node {
+                camera: None,
+                children: None,
+                extras: Default::default(),
+                extensions: Default::default(),
+                matrix: None,
+                mesh: Some(gltf::json::Index::new(0)),
+                name: None,
+                rotation: None,
+                scale: None,
+                translation: None,
+                skin: None,
+                weights: None,
+            }],
+            scenes: vec![gltf::json::Scene {
+                extensions: Default::default(),
+                extras: Default::default(),
+                name: None,
+                nodes: vec![gltf::json::Index::new(0)],
+            }],
+            ..Default::default()
+        })?;
 
-        nbt.end_compound();
-        nbt.finish();
+        let glb = gltf::binary::Glb {
+            header: gltf::binary::Header {
+                magic: *b"glTF",
+                version: 2,
+                length: json.len() as u32 + vertices.len() as u32,
+            },
+            bin: Some(Cow::Borrowed(vertices_bytes)),
+            json: Cow::Owned(json.into_bytes()),
+        };
+
+        glb.to_writer(w)?;
+        Ok(())
     }
 }
 
