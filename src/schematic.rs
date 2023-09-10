@@ -108,8 +108,11 @@ impl Schematic {
             },
         ]);
 
+        let indices = vec![0u32, 1, 2];
+
         let vertices_bytes = bytemuck::cast_slice(&vertices);
-        let vertices_byte_size = vertices_bytes.len();
+        let indices_bytes = bytemuck::cast_slice(&indices);
+        let buffer = [vertices_bytes, indices_bytes].concat();
 
         let mut min = [f32::MAX, f32::MAX, f32::MAX];
         let mut max = [f32::MIN, f32::MIN, f32::MIN];
@@ -151,24 +154,50 @@ impl Schematic {
                     normalized: false,
                     sparse: None,
                 },
+                gltf::json::Accessor {
+                    buffer_view: Some(gltf::json::Index::new(1)),
+                    byte_offset: Some(0),
+                    count: indices.len() as u32,
+                    component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::U32)),
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    type_: Checked::Valid(gltf::json::accessor::Type::Scalar),
+                    min: None,
+                    max: None,
+                    name: None,
+                    normalized: false,
+                    sparse: None,
+                },
             ],
             buffers: vec![gltf::json::Buffer {
-                byte_length: vertices_byte_size as u32,
+                byte_length: buffer.len() as u32,
                 extensions: Default::default(),
                 extras: Default::default(),
                 name: None,
                 uri: None,
             }],
-            buffer_views: vec![gltf::json::buffer::View {
-                buffer: gltf::json::Index::new(0),
-                byte_length: vertices_byte_size as u32,
-                byte_offset: None,
-                byte_stride: Some(std::mem::size_of::<Vertex>() as u32),
-                extensions: Default::default(),
-                extras: Default::default(),
-                name: None,
-                target: Some(Checked::Valid(gltf::json::buffer::Target::ArrayBuffer)),
-            }],
+            buffer_views: vec![
+                gltf::json::buffer::View {
+                    buffer: gltf::json::Index::new(0),
+                    byte_length: vertices_bytes.len() as u32,
+                    byte_offset: None,
+                    byte_stride: Some(std::mem::size_of::<Vertex>() as u32),
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    name: None,
+                    target: Some(Checked::Valid(gltf::json::buffer::Target::ArrayBuffer)),
+                },
+                gltf::json::buffer::View {
+                    buffer: gltf::json::Index::new(0),
+                    byte_length: indices_bytes.len() as u32,
+                    byte_offset: Some(vertices_bytes.len() as u32),
+                    byte_stride: None,
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    name: None,
+                    target: Some(Checked::Valid(gltf::json::buffer::Target::ElementArrayBuffer)),
+                },
+            ],
             meshes: vec![gltf::json::Mesh {
                 extensions: Default::default(),
                 extras: Default::default(),
@@ -182,7 +211,7 @@ impl Schematic {
                     },
                     extensions: Default::default(),
                     extras: Default::default(),
-                    indices: None,
+                    indices: Some(gltf::json::Index::new(2)),
                     material: None,
                     mode: Checked::Valid(gltf::json::mesh::Mode::Triangles),
                     targets: None,
@@ -216,9 +245,9 @@ impl Schematic {
             header: gltf::binary::Header {
                 magic: *b"glTF",
                 version: 2,
-                length: json.len() as u32 + vertices.len() as u32,
+                length: json.len() as u32 + buffer.len() as u32,
             },
-            bin: Some(Cow::Borrowed(vertices_bytes)),
+            bin: Some(Cow::Owned(buffer)),
             json: Cow::Owned(json.into_bytes()),
         };
 
