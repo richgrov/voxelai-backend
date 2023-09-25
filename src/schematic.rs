@@ -93,164 +93,63 @@ impl Schematic {
 
     pub fn serialize<W: Write>(&self, w: &mut W) -> Result<(), Box<dyn std::error::Error>> {
         let mut vertices = Vec::new();
-        vertices.extend_from_slice(&[
-            Vertex {
-                pos: [0.0, 0.5, 0.0],
-                color: [1.0, 0.0, 0.0],
-            },
-            Vertex {
-                pos: [-0.5, -0.5, 0.0],
-                color: [0.0, 1.0, 0.0],
-            },
-            Vertex {
-                pos: [0.5, -0.5, 0.0],
-                color: [0.0, 0.0, 1.0],
-            },
-        ]);
+        let mut indices = Vec::new();
 
-        let indices = vec![0u32, 1, 2];
+        for x in 0..self.x_size() {
+            for y in 0..self.y_size() {
+                for z in 0..self.z_size() {
+                    let color = match self.get(x, y, z) {
+                        Ok(c) if c != Self::ABSENT => c.to_rgb_normalized(),
+                        _ => continue,
+                    };
 
-        let vertices_bytes = bytemuck::cast_slice(&vertices);
-        let indices_bytes = bytemuck::cast_slice(&indices);
-        let buffer = [vertices_bytes, indices_bytes].concat();
+                    let i = vertices.len() as u32;
+                    let (xf, yf, zf) = (x as f32, y as f32, z as f32);
+                    vertices.extend_from_slice(&[
+                            Vertex { pos: [xf,    yf,    zf   ], color },
+                            Vertex { pos: [xf,    yf,    zf+1.], color },
+                            Vertex { pos: [xf,    yf+1., zf   ], color },
+                            Vertex { pos: [xf,    yf+1., zf+1.], color },
+                            Vertex { pos: [xf+1., yf,    zf   ], color },
+                            Vertex { pos: [xf+1., yf,    zf+1.], color },
+                            Vertex { pos: [xf+1., yf+1., zf   ], color },
+                            Vertex { pos: [xf+1., yf+1., zf+1.], color },
+                    ]);
 
-        let mut min = [f32::MAX, f32::MAX, f32::MAX];
-        let mut max = [f32::MIN, f32::MIN, f32::MIN];
+                    // -X Winding order: +Y+Z, +Y-Z, -Y+Z and -Y-Z, -Y+Z, +Y-Z
+                    if x == 0 || self.get(x-1, y, z).unwrap() == Self::ABSENT {
+                        indices.extend_from_slice(&[i+3, i+2, i+1, i, i+1, i+2]);
+                    }
 
-        for vertex in &vertices {
-            for i in 0..3 {
-                min[i] = f32::min(min[i], vertex.pos[i]);
-                max[i] = f32::max(max[i], vertex.pos[i]);
+                    // +X Winding order: +Y-Z, +Y+Z, -Y+Z and +Y-Z, -Y+Z, -Y-Z
+                    if x == self.x_size()-1 || self.get(x+1, y, z).unwrap() == Self::ABSENT {
+                        indices.extend_from_slice(&[i+6, i+7, i+5, i+6, i+5, i+4]);
+                    }
+
+                    // -Y Winding order: -X-Z, +X-Z, +X+Z and -X-Z, +X+Z, -X+Z
+                    if y == 0 || self.get(x, y-1, z).unwrap() == Self::ABSENT {
+                        indices.extend_from_slice(&[i, i+4, i+5, i, i+5, i+1]);
+                    }
+
+                    // +Y Winding order: +X+Z, +X-Z, -X-Z and +X+Z, -X-Z, -X+Z
+                    if y == self.y_size()-1 || self.get(x, y+1, z).unwrap() == Self::ABSENT {
+                        indices.extend_from_slice(&[i+7, i+6, i+2, i+7, i+2, i+3]);
+                    }
+
+                    // -Z Winding order: -X+Y, +X+Y, -X-Y and +X+Y, +X-Y, -X-Y
+                    if z == 0 || self.get(x, y, z-1).unwrap() == Self::ABSENT {
+                        indices.extend_from_slice(&[i+2, i+6, i, i+6, i+4, i]);
+                    }
+
+                    // +Z Winding order: +X+Y, -X+Y, -X-Y and +X+Y, -X-Y, +X-Y
+                    if z == self.z_size()-1 || self.get(x, y, z+1).unwrap() == Self::ABSENT {
+                        indices.extend_from_slice(&[i+7, i+3, i+1, i+7, i+1, i+5]);
+                    }
+                }
             }
         }
 
-        let json = gltf::json::serialize::to_string(&gltf::json::Root {
-            accessors: vec![
-                gltf::json::Accessor {
-                    buffer_view: Some(gltf::json::Index::new(0)),
-                    byte_offset: Some(0),
-                    count: vertices.len() as u32,
-                    component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::F32)),
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    type_: Checked::Valid(gltf::json::accessor::Type::Vec3),
-                    min: Some(Vec::from(min).into()),
-                    max: Some(Vec::from(max).into()),
-                    name: None,
-                    normalized: false,
-                    sparse: None,
-                },
-                gltf::json::Accessor {
-                    buffer_view: Some(gltf::json::Index::new(0)),
-                    byte_offset: Some((3 * std::mem::size_of::<f32>()) as u32),
-                    count: vertices.len() as u32,
-                    component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::F32)),
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    type_: Checked::Valid(gltf::json::accessor::Type::Vec3),
-                    min: None,
-                    max: None,
-                    name: None,
-                    normalized: false,
-                    sparse: None,
-                },
-                gltf::json::Accessor {
-                    buffer_view: Some(gltf::json::Index::new(1)),
-                    byte_offset: Some(0),
-                    count: indices.len() as u32,
-                    component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::U32)),
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    type_: Checked::Valid(gltf::json::accessor::Type::Scalar),
-                    min: None,
-                    max: None,
-                    name: None,
-                    normalized: false,
-                    sparse: None,
-                },
-            ],
-            buffers: vec![gltf::json::Buffer {
-                byte_length: buffer.len() as u32,
-                extensions: Default::default(),
-                extras: Default::default(),
-                name: None,
-                uri: None,
-            }],
-            buffer_views: vec![
-                gltf::json::buffer::View {
-                    buffer: gltf::json::Index::new(0),
-                    byte_length: vertices_bytes.len() as u32,
-                    byte_offset: None,
-                    byte_stride: Some(std::mem::size_of::<Vertex>() as u32),
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    name: None,
-                    target: Some(Checked::Valid(gltf::json::buffer::Target::ArrayBuffer)),
-                },
-                gltf::json::buffer::View {
-                    buffer: gltf::json::Index::new(0),
-                    byte_length: indices_bytes.len() as u32,
-                    byte_offset: Some(vertices_bytes.len() as u32),
-                    byte_stride: None,
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    name: None,
-                    target: Some(Checked::Valid(gltf::json::buffer::Target::ElementArrayBuffer)),
-                },
-            ],
-            meshes: vec![gltf::json::Mesh {
-                extensions: Default::default(),
-                extras: Default::default(),
-                name: None,
-                primitives: vec![gltf::json::mesh::Primitive {
-                    attributes: {
-                        let mut map = BTreeMap::new();
-                        map.insert(Checked::Valid(gltf::json::mesh::Semantic::Positions), gltf::json::Index::new(0));
-                        map.insert(Checked::Valid(gltf::json::mesh::Semantic::Colors(0)), gltf::json::Index::new(1));
-                        map
-                    },
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    indices: Some(gltf::json::Index::new(2)),
-                    material: None,
-                    mode: Checked::Valid(gltf::json::mesh::Mode::Triangles),
-                    targets: None,
-                }],
-                weights: None,
-            }],
-            nodes: vec![gltf::json::Node {
-                camera: None,
-                children: None,
-                extras: Default::default(),
-                extensions: Default::default(),
-                matrix: None,
-                mesh: Some(gltf::json::Index::new(0)),
-                name: None,
-                rotation: None,
-                scale: None,
-                translation: None,
-                skin: None,
-                weights: None,
-            }],
-            scenes: vec![gltf::json::Scene {
-                extensions: Default::default(),
-                extras: Default::default(),
-                name: None,
-                nodes: vec![gltf::json::Index::new(0)],
-            }],
-            ..Default::default()
-        })?;
-
-        let glb = gltf::binary::Glb {
-            header: gltf::binary::Header {
-                magic: *b"glTF",
-                version: 2,
-                length: json.len() as u32 + buffer.len() as u32,
-            },
-            bin: Some(Cow::Owned(buffer)),
-            json: Cow::Owned(json.into_bytes()),
-        };
-
+        let glb = to_glb(&vertices, &indices)?;
         glb.to_writer(w)?;
         Ok(())
     }
@@ -306,6 +205,149 @@ impl rlua::UserData for Schematic {
             Ok(schematic.z_size())
         });
     }
+}
+
+fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<'a>, gltf::json::Error> {
+    let vertices_bytes = bytemuck::cast_slice(&vertices);
+    let indices_bytes = bytemuck::cast_slice(&indices);
+    let buffer = [vertices_bytes, indices_bytes].concat();
+
+    let mut min = [f32::MAX, f32::MAX, f32::MAX];
+    let mut max = [f32::MIN, f32::MIN, f32::MIN];
+
+    for vertex in vertices {
+        for i in 0..3 {
+            min[i] = f32::min(min[i], vertex.pos[i]);
+            max[i] = f32::max(max[i], vertex.pos[i]);
+        }
+    }
+
+    let json = gltf::json::serialize::to_string(&gltf::json::Root {
+        accessors: vec![
+            gltf::json::Accessor {
+                buffer_view: Some(gltf::json::Index::new(0)),
+                byte_offset: Some(0),
+                count: vertices.len() as u32,
+                component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::F32)),
+                extensions: Default::default(),
+                extras: Default::default(),
+                type_: Checked::Valid(gltf::json::accessor::Type::Vec3),
+                min: Some(Vec::from(min).into()),
+                max: Some(Vec::from(max).into()),
+                name: None,
+                normalized: false,
+                sparse: None,
+            },
+            gltf::json::Accessor {
+                buffer_view: Some(gltf::json::Index::new(0)),
+                byte_offset: Some((3 * std::mem::size_of::<f32>()) as u32),
+                count: vertices.len() as u32,
+                component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::F32)),
+                extensions: Default::default(),
+                extras: Default::default(),
+                type_: Checked::Valid(gltf::json::accessor::Type::Vec3),
+                min: None,
+                max: None,
+                name: None,
+                normalized: false,
+                sparse: None,
+            },
+            gltf::json::Accessor {
+                buffer_view: Some(gltf::json::Index::new(1)),
+                byte_offset: Some(0),
+                count: indices.len() as u32,
+                component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::U32)),
+                extensions: Default::default(),
+                extras: Default::default(),
+                type_: Checked::Valid(gltf::json::accessor::Type::Scalar),
+                min: None,
+                max: None,
+                name: None,
+                normalized: false,
+                sparse: None,
+            },
+            ],
+            buffers: vec![gltf::json::Buffer {
+                byte_length: buffer.len() as u32,
+                extensions: Default::default(),
+                extras: Default::default(),
+                name: None,
+                uri: None,
+            }],
+            buffer_views: vec![
+                gltf::json::buffer::View {
+                    buffer: gltf::json::Index::new(0),
+                    byte_length: vertices_bytes.len() as u32,
+                    byte_offset: None,
+                    byte_stride: Some(std::mem::size_of::<Vertex>() as u32),
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    name: None,
+                    target: Some(Checked::Valid(gltf::json::buffer::Target::ArrayBuffer)),
+                },
+                gltf::json::buffer::View {
+                    buffer: gltf::json::Index::new(0),
+                    byte_length: indices_bytes.len() as u32,
+                    byte_offset: Some(vertices_bytes.len() as u32),
+                    byte_stride: None,
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    name: None,
+                    target: Some(Checked::Valid(gltf::json::buffer::Target::ElementArrayBuffer)),
+                },
+                ],
+                meshes: vec![gltf::json::Mesh {
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    name: None,
+                    primitives: vec![gltf::json::mesh::Primitive {
+                        attributes: {
+                            let mut map = BTreeMap::new();
+                            map.insert(Checked::Valid(gltf::json::mesh::Semantic::Positions), gltf::json::Index::new(0));
+                            map.insert(Checked::Valid(gltf::json::mesh::Semantic::Colors(0)), gltf::json::Index::new(1));
+                            map
+                        },
+                        extensions: Default::default(),
+                        extras: Default::default(),
+                        indices: Some(gltf::json::Index::new(2)),
+                        material: None,
+                        mode: Checked::Valid(gltf::json::mesh::Mode::Triangles),
+                        targets: None,
+                    }],
+                    weights: None,
+                }],
+                nodes: vec![gltf::json::Node {
+                    camera: None,
+                    children: None,
+                    extras: Default::default(),
+                    extensions: Default::default(),
+                    matrix: None,
+                    mesh: Some(gltf::json::Index::new(0)),
+                    name: None,
+                    rotation: None,
+                    scale: None,
+                    translation: None,
+                    skin: None,
+                    weights: None,
+                }],
+                scenes: vec![gltf::json::Scene {
+                    extensions: Default::default(),
+                    extras: Default::default(),
+                    name: None,
+                    nodes: vec![gltf::json::Index::new(0)],
+                }],
+                ..Default::default()
+    })?;
+
+    Ok(gltf::binary::Glb {
+        header: gltf::binary::Header {
+            magic: *b"glTF",
+            version: 2,
+            length: json.len() as u32 + buffer.len() as u32,
+        },
+        bin: Some(Cow::Owned(buffer)),
+        json: Cow::Owned(json.into_bytes()),
+    })
 }
 
 #[cfg(test)]
