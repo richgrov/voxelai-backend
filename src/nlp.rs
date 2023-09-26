@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 use serde_json::json;
 
 const SYSTEM_MESSAGE: &str = r#"You are a program that generates Minecraft builds based on a \

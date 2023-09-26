@@ -43,7 +43,7 @@ fn parse_env<T: std::str::FromStr>(var: &str, default: T) -> T {
     match std::env::var(var) {
         Ok(e) => match e.parse() {
             Ok(t) => t,
-            Err(_) => panic!("invalid {} environment variable", var),
+            Err(_) => panic!("variable {} is invalid", var),
         },
         Err(_) => default,
     }
