@@ -58,7 +58,7 @@ struct FileSystemStorage;
 #[async_trait]
 impl server::ObjectStorage for FileSystemStorage {
     async fn put(&self, id: &str, data: &[u8]) -> Result<String, Box<dyn std::error::Error>> {
-        let path = format!("{}.schem", id);
+        let path = format!("{}.glb", id);
         std::fs::write(&path, data)?;
         Ok(path)
     }
