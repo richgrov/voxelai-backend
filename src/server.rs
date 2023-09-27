@@ -1,7 +1,5 @@
-use rlua::{StdLib, Lua};
 use rocket::{routes, State, post, async_trait};
-
-use crate::{nlp, schematic::Schematic, scripting::LuaInit, block::BlockData};
+use crate::nlp;
 
 #[async_trait]
 pub trait ObjectStorage: Send + Sync {
@@ -37,26 +35,12 @@ enum ErrorResponse {
 
 #[post("/generate?<id>&<prompt>")]
 async fn generate(server: &State<Server>, id: &str, prompt: &str) -> Result<String, ErrorResponse> {
-    let script = nlp::generate(&server.openai_api_key, prompt).await
+    let schem = nlp::build(&server.openai_api_key, prompt).await
         .map_err(|e| ErrorResponse::Internal(e.to_string()))?;
 
-    let schem = build_schematic(&script)
-        .map_err(|e| ErrorResponse::NotCompletable(e.to_string()))?;
-
     let mut data = Vec::with_capacity(256);
-    schem.serialize(&mut data);
+    schem.serialize(&mut data).map_err(|e| ErrorResponse::Internal(e.to_string()))?;
 
     server.object_storage.put(id, &data).await
         .map_err(|e| ErrorResponse::Internal(e.to_string()))
-}
-
-fn build_schematic(lua_src: &str) -> Result<Schematic, rlua::Error> {
-    let lua = Lua::new_with(StdLib::MATH);
-
-    lua.context(|ctx| {
-        Schematic::initialize_lua(ctx)?;
-        BlockData::initialize_lua(ctx)?;
-
-        Ok(ctx.load(&lua_src).eval()?)
-    })
 }

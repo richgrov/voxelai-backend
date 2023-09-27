@@ -30,7 +30,7 @@ impl CloudflareR2Storage {
 #[async_trait]
 impl ObjectStorage for CloudflareR2Storage {
     async fn put(&self, id: &str, data: &[u8]) -> Result<String, Box<dyn std::error::Error>> {
-        let file = format!("{}.schem", id);
+        let file = format!("{}.glb", id);
         self.bucket.put_object(file.clone(), data).await?;
         Ok(format!("{}/{}", self.public_url, file))
     }

@@ -1,12 +1,9 @@
-mod block;
 mod cloudflare_r2;
-mod nbt;
+mod color;
 mod nlp;
 mod schematic;
-mod scripting;
 mod server;
 
-use block::Material;
 use cloudflare_r2::CloudflareR2Storage;
 use rocket::async_trait;
 
@@ -14,8 +11,6 @@ use rocket::async_trait;
 async fn main() {
     #[cfg(debug_assertions)]
     dotenvy::from_filename(".env.local").unwrap();
-
-    unsafe { Material::init_string_map(); }
 
     let config = rocket::Config {
         address: parse_env("BIND", "127.0.0.1".parse().unwrap()),
@@ -26,8 +21,10 @@ async fn main() {
     let openai_key = expect_env("OPENAI_API_KEY");
 
     let storage: Box<dyn server::ObjectStorage> = if std::env::var("FILE_SYSTEM_STORAGE").is_ok() {
+        println!("Generations will be stored on the file system");
         Box::new(FileSystemStorage)
     } else {
+        println!("Using Cloudflare R2 for object storage");
         let bucket_name = expect_env("R2_BUCKET_NAME");
         let account_id = expect_env("R2_ACCOUNT_ID");
         let public_url = expect_env("R2_PUBLIC_URL");
@@ -47,7 +44,7 @@ fn parse_env<T: std::str::FromStr>(var: &str, default: T) -> T {
     match std::env::var(var) {
         Ok(e) => match e.parse() {
             Ok(t) => t,
-            Err(_) => panic!("invalid {} environment variable", var),
+            Err(_) => panic!("variable {} is invalid", var),
         },
         Err(_) => default,
     }
@@ -62,7 +59,7 @@ struct FileSystemStorage;
 #[async_trait]
 impl server::ObjectStorage for FileSystemStorage {
     async fn put(&self, id: &str, data: &[u8]) -> Result<String, Box<dyn std::error::Error>> {
-        let path = format!("{}.schem", id);
+        let path = format!("{}.glb", id);
         std::fs::write(&path, data)?;
         Ok(path)
     }
