@@ -2,7 +2,6 @@ mod cloudflare_r2;
 mod color;
 mod nlp;
 mod schematic;
-mod scripting;
 mod server;
 
 use cloudflare_r2::CloudflareR2Storage;

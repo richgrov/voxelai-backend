@@ -6,8 +6,6 @@ use gltf::json::accessor::GenericComponentType;
 use gltf::json::validation::Checked;
 
 use crate::color::Color;
-use crate::lua_err;
-use crate::scripting::LuaInit;
 
 #[derive(Clone)]
 pub struct Schematic {
@@ -38,20 +36,20 @@ impl Schematic {
         }
     }
 
-    pub fn set(&mut self, x: u8, y: u8, z: u8, color: Color) -> Result<(), rlua::Error> {
+    pub fn set(&mut self, x: u8, y: u8, z: u8, color: Color) -> Option<()> {
         let index = self.get_index(x, y, z)?;
         self.blocks[index] = color;
-        Ok(())
+        Some(())
     }
 
-    fn get(&self, x: u8, y: u8, z: u8) -> Result<Color, rlua::Error> {
+    fn get(&self, x: u8, y: u8, z: u8) -> Option<Color> {
         let index = self.get_index(x, y, z)?;
-        Ok(self.blocks[index])
+        Some(self.blocks[index])
     }
 
     pub fn fill(
         &mut self, x1: u8, y1: u8, z1: u8, x2: u8, y2: u8, z2: u8, block: Color
-    ) -> Result<(), rlua::Error> {
+    ) -> Option<()> {
         for x in x1..=x2 {
             for y in y1..=y2 {
                 for z in z1..=z2 {
@@ -60,23 +58,23 @@ impl Schematic {
             }
         }
 
-        Ok(())
+        Some(())
     }
 
-    fn get_index(&self, x: u8, y: u8, z: u8) -> Result<usize, rlua::Error> {
+    fn get_index(&self, x: u8, y: u8, z: u8) -> Option<usize> {
         if x >= self.x_size() {
-            lua_err!("invalid x {}", x)
+            return None
         }
 
         if y >= self.y_size() {
-            lua_err!("invalid y {}", y)
+            return None
         }
 
         if z >= self.z_size() {
-            lua_err!("invalid z {}", z)
+            return None
         }
 
-        Ok((y as usize * self.z_size as usize + z as usize) * self.x_size as usize + x as usize)
+        Some((y as usize * self.z_size as usize + z as usize) * self.x_size as usize + x as usize)
     }
 
     pub fn x_size(&self) -> u8 {
@@ -99,7 +97,7 @@ impl Schematic {
             for y in 0..self.y_size() {
                 for z in 0..self.z_size() {
                     let color = match self.get(x, y, z) {
-                        Ok(c) if c != Self::ABSENT => c.to_rgb_normalized(),
+                        Some(c) if c != Self::ABSENT => c.to_rgb_normalized(),
                         _ => continue,
                     };
 
@@ -152,58 +150,6 @@ impl Schematic {
         let glb = to_glb(&vertices, &indices)?;
         glb.to_writer(w)?;
         Ok(())
-    }
-}
-
-impl LuaInit for Schematic {
-    fn initialize_lua(ctx: rlua::Context) -> Result<(), rlua::Error> {
-        let ctor = ctx.create_function(|_, (x_size, y_size, z_size): (u8, u8, u8)| {
-            Ok(Schematic::new(x_size, y_size, z_size))
-        })?;
-
-        ctx.globals().set("Schematic", ctor)
-    }
-}
-
-impl rlua::UserData for Schematic {
-    fn add_methods<'lua, T: rlua::UserDataMethods<'lua, Self>>(methods: &mut T) {
-        methods.add_method_mut("Set", |
-            _,
-            schematic,
-            (x, y, z, color_str): (_, _, _, String)
-        | {
-            let color = match Color::try_from_octal_string(&color_str) {
-                Ok(c) => c,
-                Err(_) => lua_err!("color \"{}\" is invalid", color_str),
-            };
-
-            schematic.set(x, y, z, color)
-        });
-
-        methods.add_method_mut("Fill", |
-            _,
-            schematic,
-            (x1, y1, z1, x2, y2, z2, color_str): (_, _, _, _, _, _, String)
-        | {
-            let color = match Color::try_from_octal_string(&color_str) {
-                Ok(c) => c,
-                Err(_) => lua_err!("color \"{}\" is invalid", color_str),
-            };
-    
-            schematic.fill(x1, y1, z1, x2, y2, z2, color)
-        });
-
-        methods.add_method("xSize", |_, schematic, ()| {
-            Ok(schematic.x_size())
-        });
-
-        methods.add_method("ySize", |_, schematic, ()| {
-            Ok(schematic.y_size())
-        });
-
-        methods.add_method("zSize", |_, schematic, ()| {
-            Ok(schematic.z_size())
-        });
     }
 }
 
