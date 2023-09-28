@@ -14,10 +14,16 @@ async fn main() {
     #[cfg(debug_assertions)]
     dotenvy::from_filename(".env.local").unwrap();
 
+    #[cfg(debug_assertions)]
+    let default_cfg = rocket::Config::debug_default();
+
+    #[cfg(not(debug_assertions))]
+    let default_cfg = rocket::Config::release_default();
+
     let config = rocket::Config {
         address: parse_env("BIND", "127.0.0.1".parse().unwrap()),
         port: parse_env("PORT", 8080),
-        ..rocket::Config::release_default()
+        ..default_cfg
     };
 
     let openai_key = expect_env("OPENAI_API_KEY");
