@@ -15,13 +15,13 @@ The Lua API is as follows:
 -- Max size along any axis is 255
 function Schematic(xSize: number, ySize: number, zSize: number): Schematic
 
--- Bounds are [0, the size of the axis)
+-- Bounds are (0, the size of the axis - 1)
 -- Color is an octal string that formats an 8-bit color as RRRGGGBB. Max value is 773. IMPORTANT:
 -- 000 is the default value in schematics and is treated as EMPTY, not BLACK. All other values make
 -- a color. For example, '073' is light blue.
 function Schematic:Set(x: number, y: number, z: number, color: string)
 
--- Bounds are [0, the size of the axis)
+-- Bounds are (0, the size of the axis - 1)
 function Schematic:Fill(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, color: string)
 
 DO NOT GENERATE AN EXPLANATION- ONLY CODE. Your response will not be shown to the user, only the \
