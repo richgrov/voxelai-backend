@@ -49,7 +49,7 @@ pub async fn build(api_key: &str, prompt: &str) -> Result<Schematic, NlpError> {
     let response = generate_code(api_key, prompt).await
         .map_err(|e| NlpError::OpenAi(e))?;
     let message = &response.choices[0].message.content;
-    println!("{}", message);
+    tracing::info!(preprocessed_code = message);
     let code = match message.strip_prefix("```lua") {
         Some(str) => str[..str.len() - 3].to_owned(),
         None => message.to_owned(),

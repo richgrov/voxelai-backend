@@ -9,6 +9,8 @@ use rocket::async_trait;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     #[cfg(debug_assertions)]
     dotenvy::from_filename(".env.local").unwrap();
 
@@ -21,10 +23,10 @@ async fn main() {
     let openai_key = expect_env("OPENAI_API_KEY");
 
     let storage: Box<dyn server::ObjectStorage> = if std::env::var("FILE_SYSTEM_STORAGE").is_ok() {
-        println!("Generations will be stored on the file system");
+        tracing::info!("Generations will be stored on the file system");
         Box::new(FileSystemStorage)
     } else {
-        println!("Using Cloudflare R2 for object storage");
+        tracing::info!("Using Cloudflare R2 for object storage");
         let bucket_name = expect_env("R2_BUCKET_NAME");
         let account_id = expect_env("R2_ACCOUNT_ID");
         let public_url = expect_env("R2_PUBLIC_URL");
