@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 
 use gltf::json::accessor::GenericComponentType;
@@ -15,7 +15,7 @@ pub struct Schematic {
     blocks: Vec<Color>,
 }
 
-#[derive(Clone, Copy, bytemuck::Zeroable, bytemuck::Pod)]
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Zeroable, bytemuck::Pod)]
 #[repr(C)]
 struct Vertex {
     pos: [f32; 3],
@@ -147,10 +147,31 @@ impl Schematic {
             }
         }
 
-        let glb = to_glb(&vertices, &indices)?;
+        let (optimized_vert, optimized_idx) = remove_unused_vertices(&vertices, &indices);
+        tracing::info!("Removed {} unused vertices", vertices.len() - optimized_vert.len());
+        let glb = to_glb(&optimized_vert, &optimized_idx)?;
         glb.to_writer(w)?;
         Ok(())
     }
+}
+
+fn remove_unused_vertices(vertices: &[Vertex], indices: &[u32]) -> (Vec<Vertex>, Vec<u32>) {
+    let mut index_convert = HashMap::with_capacity(vertices.len());
+    let mut new_vertices = Vec::with_capacity(vertices.len());
+    let mut new_indices = Vec::with_capacity(indices.len());
+    for old_index in indices {
+        match index_convert.get(old_index) {
+            Some(new_index) => new_indices.push(*new_index),
+            None => {
+                let new_index = new_vertices.len() as u32;
+                index_convert.insert(old_index, new_index);
+                new_vertices.push(vertices[*old_index as usize]);
+                new_indices.push(new_index);
+            },
+        }
+    }
+
+    (new_vertices, new_indices)
 }
 
 fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<'a>, gltf::json::Error> {
@@ -300,7 +321,7 @@ fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<
 mod tests {
     use crate::color::Color;
 
-    use super::Schematic;
+    use super::{Schematic, Vertex, remove_unused_vertices};
 
     #[test]
     fn test_coordinates() {
@@ -332,5 +353,19 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_remove_unused_vertices() {
+        fn vert(n: f32) -> Vertex {
+            Vertex { pos: [n; 3], color: [n; 3] }
+        }
+
+        let vertices = vec![vert(0.), vert(1.), vert(2.), vert(3.), vert(4.), vert(5.), vert(6.), vert(7.)];
+        let indices = vec![0, 1, 2, 2, 4, 0, 0, 7, 1];
+        let (optimized_verts, optimized_inds) = remove_unused_vertices(&vertices, &indices);
+        
+        assert_eq!(optimized_verts, vec![vert(0.), vert(1.), vert(2.), vert(4.), vert(7.)]);
+        assert_eq!(optimized_inds, vec![0, 1, 2, 2, 3, 0, 0, 4, 1]);
     }
 }
