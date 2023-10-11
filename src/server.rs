@@ -1,4 +1,6 @@
-use rocket::{routes, State, post, async_trait};
+use std::time::Instant;
+
+use rocket::{routes, State, post, async_trait, http::Status};
 use crate::nlp;
 
 #[async_trait]
@@ -25,22 +27,34 @@ pub async fn run(
         .launch().await.unwrap();
 }
 
-#[derive(rocket::Responder)]
-enum ErrorResponse {
-    #[response(status = 500)]
-    Internal(String),
-    #[response(status = 504)]
-    NotCompletable(String),
-}
-
 #[post("/generate?<id>&<prompt>")]
-async fn generate(server: &State<Server>, id: &str, prompt: &str) -> Result<String, ErrorResponse> {
-    let schem = nlp::build(&server.openai_api_key, prompt).await
-        .map_err(|e| ErrorResponse::Internal(e.to_string()))?;
+async fn generate(server: &State<Server>, id: &str, prompt: &str) -> Result<String, Status> {
+    let start = Instant::now();
+    let schem = match nlp::build(&server.openai_api_key, prompt).await {
+        Ok(s) => {
+            tracing::info!("built after {:?}", start.elapsed());
+            s
+        },
+        Err(e) => {
+            tracing::error!("failed to generate build: {}", e);
+            return Err(Status::InternalServerError)
+        },
+    };
 
     let mut data = Vec::with_capacity(256);
-    schem.serialize(&mut data).map_err(|e| ErrorResponse::Internal(e.to_string()))?;
+    match schem.serialize(&mut data) {
+        Ok(_) => tracing::info!("serialized after {:?}", start.elapsed()),
+        Err(e) => {
+            tracing::error!("failed to serialize build: {}", e);
+            return Err(Status::InternalServerError)
+        },
+    }
 
-    server.object_storage.put(id, &data).await
-        .map_err(|e| ErrorResponse::Internal(e.to_string()))
+    match server.object_storage.put(id, &data).await {
+        Ok(loc) => Ok(loc),
+        Err(e) => {
+            tracing::error!("failed to store build: {}", e);
+            Err(Status::InternalServerError)
+        },
+    }
 }

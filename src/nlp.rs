@@ -46,14 +46,7 @@ struct Message {
 }
 
 pub async fn build(api_key: &str, prompt: &str) -> Result<Schematic, NlpError> {
-    let response = generate_code(api_key, prompt).await
-        .map_err(|e| NlpError::OpenAi(e))?;
-    let message = &response.choices[0].message.content;
-    tracing::info!(preprocessed_code = message);
-    let code = match message.strip_prefix("```lua") {
-        Some(str) => str[..str.len() - 3].to_owned(),
-        None => message.to_owned(),
-    };
+    let code = generate_code(api_key, prompt).await?;
 
     let lua = Lua::new_with(StdLib::MATH);
     lua.context(|ctx| {
@@ -66,7 +59,23 @@ pub async fn build(api_key: &str, prompt: &str) -> Result<Schematic, NlpError> {
     }).map_err(|e| NlpError::Lua(e))
 }
 
-async fn generate_code(api_key: &str, prompt: &str) -> Result<Response, reqwest::Error> {
+async fn generate_code(api_key: &str, prompt: &str) -> Result<String, NlpError> {
+    let response_str = invoke_openai(api_key, prompt).await
+        .map_err(|e| NlpError::Network(e))?;
+    tracing::info!(response = response_str);
+
+    let response_json: Response = serde_json::from_str(&response_str)
+        .map_err(|e| NlpError::Deserialize(e, response_str))?;
+
+    let message = &response_json.choices[0].message.content;
+
+    Ok(match message.strip_prefix("```lua") {
+        Some(str) => str[..str.len() - 3].to_owned(),
+        None => message.to_owned(),
+    })
+}
+
+async fn invoke_openai(api_key: &str, prompt: &str) -> Result<String, reqwest::Error> {
     let client = reqwest::Client::new();
     client.post("https://api.openai.com/v1/chat/completions")
         .json(&json!({
@@ -80,18 +89,20 @@ async fn generate_code(api_key: &str, prompt: &str) -> Result<Response, reqwest:
         }))
         .header("Authorization", format!("Bearer {}", api_key))
         .send().await?
-        .json::<Response>().await
+        .text().await
 }
 
 pub enum NlpError {
-    OpenAi(reqwest::Error),
+    Network(reqwest::Error),
+    Deserialize(serde_json::Error, String),
     Lua(rlua::Error),
 }
 
 impl fmt::Display for NlpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::OpenAi(e) => write!(f, "OpenAI request failed: {}", e),
+            Self::Network(e) => write!(f, "network request failed: {}", e),
+            Self::Deserialize(e, src) => write!(f, "deserialization failed: {}, original: {}", e, src),
             Self::Lua(e) => write!(f, "error executing Lua: {}", e),
         }
     }
