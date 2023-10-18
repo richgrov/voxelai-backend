@@ -102,46 +102,58 @@ impl Schematic {
                     };
 
                     let i = vertices.len() as u32;
-                    let (xf, yf, zf) = (x as f32, y as f32, z as f32);
-                    vertices.extend_from_slice(&[
-                            Vertex { pos: [xf,    yf,    zf   ], color },
-                            Vertex { pos: [xf,    yf,    zf+1.], color },
-                            Vertex { pos: [xf,    yf+1., zf   ], color },
-                            Vertex { pos: [xf,    yf+1., zf+1.], color },
-                            Vertex { pos: [xf+1., yf,    zf   ], color },
-                            Vertex { pos: [xf+1., yf,    zf+1.], color },
-                            Vertex { pos: [xf+1., yf+1., zf   ], color },
-                            Vertex { pos: [xf+1., yf+1., zf+1.], color },
-                    ]);
+                    let mut vertices_added = false;
 
                     // -X Winding order: +Y+Z, +Y-Z, -Y+Z and -Y-Z, -Y+Z, +Y-Z
                     if x == 0 || self.get(x-1, y, z).unwrap() == Self::ABSENT {
                         indices.extend_from_slice(&[i+3, i+2, i+1, i, i+1, i+2]);
+                        vertices_added = true;
                     }
 
                     // +X Winding order: +Y-Z, +Y+Z, -Y+Z and +Y-Z, -Y+Z, -Y-Z
                     if x == self.x_size()-1 || self.get(x+1, y, z).unwrap() == Self::ABSENT {
                         indices.extend_from_slice(&[i+6, i+7, i+5, i+6, i+5, i+4]);
+                        vertices_added = true;
                     }
 
                     // -Y Winding order: -X-Z, +X-Z, +X+Z and -X-Z, +X+Z, -X+Z
                     if y == 0 || self.get(x, y-1, z).unwrap() == Self::ABSENT {
                         indices.extend_from_slice(&[i, i+4, i+5, i, i+5, i+1]);
+                        vertices_added = true;
                     }
 
                     // +Y Winding order: +X+Z, +X-Z, -X-Z and +X+Z, -X-Z, -X+Z
                     if y == self.y_size()-1 || self.get(x, y+1, z).unwrap() == Self::ABSENT {
                         indices.extend_from_slice(&[i+7, i+6, i+2, i+7, i+2, i+3]);
+                        vertices_added = true;
                     }
 
                     // -Z Winding order: -X+Y, +X+Y, -X-Y and +X+Y, +X-Y, -X-Y
                     if z == 0 || self.get(x, y, z-1).unwrap() == Self::ABSENT {
                         indices.extend_from_slice(&[i+2, i+6, i, i+6, i+4, i]);
+                        vertices_added = true;
                     }
 
                     // +Z Winding order: +X+Y, -X+Y, -X-Y and +X+Y, -X-Y, +X-Y
                     if z == self.z_size()-1 || self.get(x, y, z+1).unwrap() == Self::ABSENT {
                         indices.extend_from_slice(&[i+7, i+3, i+1, i+7, i+1, i+5]);
+                        vertices_added = true;
+                    }
+
+                    // Large solid mehses can result in lots of redundant vertices and cause OOM.
+                    // This guard is an attempt to reduce memory consumption before optimization.
+                    if vertices_added {
+                        let (xf, yf, zf) = (x as f32, y as f32, z as f32);
+                        vertices.extend_from_slice(&[
+                                Vertex { pos: [xf,    yf,    zf   ], color },
+                                Vertex { pos: [xf,    yf,    zf+1.], color },
+                                Vertex { pos: [xf,    yf+1., zf   ], color },
+                                Vertex { pos: [xf,    yf+1., zf+1.], color },
+                                Vertex { pos: [xf+1., yf,    zf   ], color },
+                                Vertex { pos: [xf+1., yf,    zf+1.], color },
+                                Vertex { pos: [xf+1., yf+1., zf   ], color },
+                                Vertex { pos: [xf+1., yf+1., zf+1.], color },
+                        ]);
                     }
                 }
             }
