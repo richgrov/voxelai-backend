@@ -115,7 +115,7 @@ impl rlua::UserData for Schematic {
             schematic,
             (x, y, z, color_str): (_, _, _, String)
         | {
-            let color = match Color::try_from_octal_string(&color_str) {
+            let color = match Color::try_from_hex_string(&color_str) {
                 Ok(c) => c,
                 Err(_) => return Err(RuntimeError(format!("color \"{}\" is invalid", color_str))),
             };
@@ -131,7 +131,7 @@ impl rlua::UserData for Schematic {
             schematic,
             (x1, y1, z1, x2, y2, z2, color_str): (_, _, _, _, _, _, String)
         | {
-            let color = match Color::try_from_octal_string(&color_str) {
+            let color = match Color::try_from_hex_string(&color_str) {
                 Ok(c) => c,
                 Err(_) => return Err(RuntimeError(format!("color \"{}\" is invalid", color_str))),
             };

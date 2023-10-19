@@ -12,7 +12,7 @@ pub struct Schematic {
     x_size: u8,
     y_size: u8,
     z_size: u8,
-    blocks: Vec<Color>,
+    blocks: Vec<Option<Color>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Zeroable, bytemuck::Pod)]
@@ -23,8 +23,6 @@ struct Vertex {
 }
 
 impl Schematic {
-    const ABSENT: Color = Color(0);
-
     pub fn new(x_size: u8, y_size: u8, z_size: u8) -> Self {
         let capacity = x_size as usize * y_size as usize * z_size as usize;
 
@@ -32,17 +30,17 @@ impl Schematic {
             x_size,
             y_size,
             z_size,
-            blocks: vec![Color(0); capacity],
+            blocks: vec![None; capacity],
         }
     }
 
     pub fn set(&mut self, x: u8, y: u8, z: u8, color: Color) -> Option<()> {
         let index = self.get_index(x, y, z)?;
-        self.blocks[index] = color;
+        self.blocks[index] = Some(color);
         Some(())
     }
 
-    fn get(&self, x: u8, y: u8, z: u8) -> Option<Color> {
+    fn get(&self, x: u8, y: u8, z: u8) -> Option<Option<Color>> {
         let index = self.get_index(x, y, z)?;
         Some(self.blocks[index])
     }
@@ -97,7 +95,7 @@ impl Schematic {
             for y in 0..self.y_size() {
                 for z in 0..self.z_size() {
                     let color = match self.get(x, y, z) {
-                        Some(c) if c != Self::ABSENT => c.to_rgb_normalized(),
+                        Some(Some(c)) => c.to_rgb_normalized(),
                         _ => continue,
                     };
 
@@ -105,37 +103,37 @@ impl Schematic {
                     let mut vertices_added = false;
 
                     // -X Winding order: +Y+Z, +Y-Z, -Y+Z and -Y-Z, -Y+Z, +Y-Z
-                    if x == 0 || self.get(x-1, y, z).unwrap() == Self::ABSENT {
+                    if x == 0 || self.get(x-1, y, z).unwrap().is_none() {
                         indices.extend_from_slice(&[i+3, i+2, i+1, i, i+1, i+2]);
                         vertices_added = true;
                     }
 
                     // +X Winding order: +Y-Z, +Y+Z, -Y+Z and +Y-Z, -Y+Z, -Y-Z
-                    if x == self.x_size()-1 || self.get(x+1, y, z).unwrap() == Self::ABSENT {
+                    if x == self.x_size()-1 || self.get(x+1, y, z).unwrap().is_none() {
                         indices.extend_from_slice(&[i+6, i+7, i+5, i+6, i+5, i+4]);
                         vertices_added = true;
                     }
 
                     // -Y Winding order: -X-Z, +X-Z, +X+Z and -X-Z, +X+Z, -X+Z
-                    if y == 0 || self.get(x, y-1, z).unwrap() == Self::ABSENT {
+                    if y == 0 || self.get(x, y-1, z).unwrap().is_none() {
                         indices.extend_from_slice(&[i, i+4, i+5, i, i+5, i+1]);
                         vertices_added = true;
                     }
 
                     // +Y Winding order: +X+Z, +X-Z, -X-Z and +X+Z, -X-Z, -X+Z
-                    if y == self.y_size()-1 || self.get(x, y+1, z).unwrap() == Self::ABSENT {
+                    if y == self.y_size()-1 || self.get(x, y+1, z).unwrap().is_none() {
                         indices.extend_from_slice(&[i+7, i+6, i+2, i+7, i+2, i+3]);
                         vertices_added = true;
                     }
 
                     // -Z Winding order: -X+Y, +X+Y, -X-Y and +X+Y, +X-Y, -X-Y
-                    if z == 0 || self.get(x, y, z-1).unwrap() == Self::ABSENT {
+                    if z == 0 || self.get(x, y, z-1).unwrap().is_none() {
                         indices.extend_from_slice(&[i+2, i+6, i, i+6, i+4, i]);
                         vertices_added = true;
                     }
 
                     // +Z Winding order: +X+Y, -X+Y, -X-Y and +X+Y, -X-Y, +X-Y
-                    if z == self.z_size()-1 || self.get(x, y, z+1).unwrap() == Self::ABSENT {
+                    if z == self.z_size()-1 || self.get(x, y, z+1).unwrap().is_none() {
                         indices.extend_from_slice(&[i+7, i+3, i+1, i+7, i+1, i+5]);
                         vertices_added = true;
                     }
@@ -338,17 +336,27 @@ mod tests {
     #[test]
     fn test_coordinates() {
         let mut schem = Schematic::new(10, 10, 10);
-        schem.set(0, 0, 0, Color(0o070)).unwrap();
-        schem.set(9, 9, 9, Color(1)).unwrap();
+        schem.set(0, 0, 0, Color(0, 0, 0)).unwrap();
+        schem.set(9, 9, 9, Color(123, 255, 64)).unwrap();
 
-        assert_eq!(schem.get(0, 0, 0).unwrap(), Color(0o070)); 
-        assert_eq!(schem.get(9, 9, 9).unwrap(), Color(1)); 
+        for x in 0..10 {
+            for y in 0..10 {
+                for z in 0..10 {
+                    let expected = match (x, y, z) {
+                        (0, 0, 0) => Some(Color(0, 0, 0)),
+                        (9, 9, 9) => Some(Color(123, 255, 64)),
+                        _ => None,
+                    };
+                    assert_eq!(schem.get(x, y, z).unwrap(), expected);
+                }
+            }
+        }
     }
 
     #[test]
     fn test_fill() {
         let mut schem = Schematic::new(10, 10, 10);
-        schem.fill(1, 2, 3, 7, 8, 9, Color(1)).unwrap();
+        schem.fill(1, 2, 3, 7, 8, 9, Color(1, 2, 3)).unwrap();
 
         for x in 0..schem.x_size() {
             for y in 0..schem.y_size() {
@@ -356,9 +364,9 @@ mod tests {
                     let expected = if (1..=7).contains(&x) &&
                                       (2..=8).contains(&y) &&
                                       (3..=9).contains(&z) {
-                        Color(1)
+                        Some(Color(1, 2, 3))
                     } else {
-                        Color(0)
+                        None
                     };
 
                     assert_eq!(schem.get(x, y, z).unwrap(), expected);
