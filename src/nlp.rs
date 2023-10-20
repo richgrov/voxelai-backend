@@ -12,13 +12,11 @@ generate Lua code which is executed in a sandbox to construct the mesh. \
 The Lua API is as follows:
 
 -- Creates a schematic
--- Max size along any axis is 255
+-- Max size along any axis is 128
 function Schematic(xSize: number, ySize: number, zSize: number): Schematic
 
 -- Bounds are (0, the size of the axis - 1)
--- Color is an octal string that formats an 8-bit color as RRRGGGBB. Max value is 773. IMPORTANT:
--- 000 is the default value in schematics and is treated as EMPTY, not BLACK. All other values make
--- a color. For example, '073' is light blue.
+-- Color is a 6-digit hex string without the #.
 function Schematic:Set(x: number, y: number, z: number, color: string)
 
 -- Bounds are (0, the size of the axis - 1)
@@ -51,6 +49,9 @@ pub async fn build(api_key: &str, prompt: &str) -> Result<Schematic, NlpError> {
     let lua = Lua::new_with(StdLib::MATH);
     lua.context(|ctx| {
         let schematic_ctor = ctx.create_function(|_, (x_size, y_size, z_size): (u8, u8, u8)| {
+            if x_size > 128 || y_size > 128 || z_size > 128 {
+                return Err(RuntimeError(format!("schematic size {}x{}x{} too big", x_size, y_size, z_size)))
+            }
             Ok(Schematic::new(x_size, y_size, z_size))
         })?;
         ctx.globals().set("Schematic", schematic_ctor)?;
