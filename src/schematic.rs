@@ -46,7 +46,14 @@ impl Schematic {
     }
 
     pub fn fill(
-        &mut self, x1: u8, y1: u8, z1: u8, x2: u8, y2: u8, z2: u8, block: Color
+        &mut self,
+        x1: u8,
+        y1: u8,
+        z1: u8,
+        x2: u8,
+        y2: u8,
+        z2: u8,
+        block: Color,
     ) -> Option<()> {
         for x in x1..=x2 {
             for y in y1..=y2 {
@@ -61,15 +68,15 @@ impl Schematic {
 
     fn get_index(&self, x: u8, y: u8, z: u8) -> Option<usize> {
         if x >= self.x_size() {
-            return None
+            return None;
         }
 
         if y >= self.y_size() {
-            return None
+            return None;
         }
 
         if z >= self.z_size() {
-            return None
+            return None;
         }
 
         Some((y as usize * self.z_size as usize + z as usize) * self.x_size as usize + x as usize)
@@ -103,38 +110,38 @@ impl Schematic {
                     let mut vertices_added = false;
 
                     // -X Winding order: +Y+Z, +Y-Z, -Y+Z and -Y-Z, -Y+Z, +Y-Z
-                    if x == 0 || self.get(x-1, y, z).unwrap().is_none() {
-                        indices.extend_from_slice(&[i+3, i+2, i+1, i, i+1, i+2]);
+                    if x == 0 || self.get(x - 1, y, z).unwrap().is_none() {
+                        indices.extend_from_slice(&[i + 3, i + 2, i + 1, i, i + 1, i + 2]);
                         vertices_added = true;
                     }
 
                     // +X Winding order: +Y-Z, +Y+Z, -Y+Z and +Y-Z, -Y+Z, -Y-Z
-                    if x == self.x_size()-1 || self.get(x+1, y, z).unwrap().is_none() {
-                        indices.extend_from_slice(&[i+6, i+7, i+5, i+6, i+5, i+4]);
+                    if x == self.x_size() - 1 || self.get(x + 1, y, z).unwrap().is_none() {
+                        indices.extend_from_slice(&[i + 6, i + 7, i + 5, i + 6, i + 5, i + 4]);
                         vertices_added = true;
                     }
 
                     // -Y Winding order: -X-Z, +X-Z, +X+Z and -X-Z, +X+Z, -X+Z
-                    if y == 0 || self.get(x, y-1, z).unwrap().is_none() {
-                        indices.extend_from_slice(&[i, i+4, i+5, i, i+5, i+1]);
+                    if y == 0 || self.get(x, y - 1, z).unwrap().is_none() {
+                        indices.extend_from_slice(&[i, i + 4, i + 5, i, i + 5, i + 1]);
                         vertices_added = true;
                     }
 
                     // +Y Winding order: +X+Z, +X-Z, -X-Z and +X+Z, -X-Z, -X+Z
-                    if y == self.y_size()-1 || self.get(x, y+1, z).unwrap().is_none() {
-                        indices.extend_from_slice(&[i+7, i+6, i+2, i+7, i+2, i+3]);
+                    if y == self.y_size() - 1 || self.get(x, y + 1, z).unwrap().is_none() {
+                        indices.extend_from_slice(&[i + 7, i + 6, i + 2, i + 7, i + 2, i + 3]);
                         vertices_added = true;
                     }
 
                     // -Z Winding order: -X+Y, +X+Y, -X-Y and +X+Y, +X-Y, -X-Y
-                    if z == 0 || self.get(x, y, z-1).unwrap().is_none() {
-                        indices.extend_from_slice(&[i+2, i+6, i, i+6, i+4, i]);
+                    if z == 0 || self.get(x, y, z - 1).unwrap().is_none() {
+                        indices.extend_from_slice(&[i + 2, i + 6, i, i + 6, i + 4, i]);
                         vertices_added = true;
                     }
 
                     // +Z Winding order: +X+Y, -X+Y, -X-Y and +X+Y, -X-Y, +X-Y
-                    if z == self.z_size()-1 || self.get(x, y, z+1).unwrap().is_none() {
-                        indices.extend_from_slice(&[i+7, i+3, i+1, i+7, i+1, i+5]);
+                    if z == self.z_size() - 1 || self.get(x, y, z + 1).unwrap().is_none() {
+                        indices.extend_from_slice(&[i + 7, i + 3, i + 1, i + 7, i + 1, i + 5]);
                         vertices_added = true;
                     }
 
@@ -142,6 +149,7 @@ impl Schematic {
                     // This guard is an attempt to reduce memory consumption before optimization.
                     if vertices_added {
                         let (xf, yf, zf) = (x as f32, y as f32, z as f32);
+                        #[rustfmt::skip]
                         vertices.extend_from_slice(&[
                                 Vertex { pos: [xf,    yf,    zf   ], color },
                                 Vertex { pos: [xf,    yf,    zf+1.], color },
@@ -158,7 +166,10 @@ impl Schematic {
         }
 
         let (optimized_vert, optimized_idx) = remove_unused_vertices(&vertices, &indices);
-        tracing::info!("Removed {} unused vertices", vertices.len() - optimized_vert.len());
+        tracing::info!(
+            "Removed {} unused vertices",
+            vertices.len() - optimized_vert.len()
+        );
         let glb = to_glb(&optimized_vert, &optimized_idx)?;
         glb.to_writer(w)?;
         Ok(())
@@ -177,14 +188,17 @@ fn remove_unused_vertices(vertices: &[Vertex], indices: &[u32]) -> (Vec<Vertex>,
                 index_convert.insert(old_index, new_index);
                 new_vertices.push(vertices[*old_index as usize]);
                 new_indices.push(new_index);
-            },
+            }
         }
     }
 
     (new_vertices, new_indices)
 }
 
-fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<'a>, gltf::json::Error> {
+fn to_glb<'a>(
+    vertices: &[Vertex],
+    indices: &[u32],
+) -> Result<gltf::binary::Glb<'a>, gltf::json::Error> {
     let vertices_bytes = bytemuck::cast_slice(&vertices);
     let indices_bytes = bytemuck::cast_slice(&indices);
     let buffer = [vertices_bytes, indices_bytes].concat();
@@ -205,7 +219,9 @@ fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<
                 buffer_view: Some(gltf::json::Index::new(0)),
                 byte_offset: Some(0),
                 count: vertices.len() as u32,
-                component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::F32)),
+                component_type: Checked::Valid(GenericComponentType(
+                    gltf::json::accessor::ComponentType::F32,
+                )),
                 extensions: Default::default(),
                 extras: Default::default(),
                 type_: Checked::Valid(gltf::json::accessor::Type::Vec3),
@@ -219,7 +235,9 @@ fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<
                 buffer_view: Some(gltf::json::Index::new(0)),
                 byte_offset: Some((3 * std::mem::size_of::<f32>()) as u32),
                 count: vertices.len() as u32,
-                component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::F32)),
+                component_type: Checked::Valid(GenericComponentType(
+                    gltf::json::accessor::ComponentType::F32,
+                )),
                 extensions: Default::default(),
                 extras: Default::default(),
                 type_: Checked::Valid(gltf::json::accessor::Type::Vec3),
@@ -233,7 +251,9 @@ fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<
                 buffer_view: Some(gltf::json::Index::new(1)),
                 byte_offset: Some(0),
                 count: indices.len() as u32,
-                component_type: Checked::Valid(GenericComponentType(gltf::json::accessor::ComponentType::U32)),
+                component_type: Checked::Valid(GenericComponentType(
+                    gltf::json::accessor::ComponentType::U32,
+                )),
                 extensions: Default::default(),
                 extras: Default::default(),
                 type_: Checked::Valid(gltf::json::accessor::Type::Scalar),
@@ -243,77 +263,85 @@ fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<
                 normalized: false,
                 sparse: None,
             },
-            ],
-            buffers: vec![gltf::json::Buffer {
-                byte_length: buffer.len() as u32,
+        ],
+        buffers: vec![gltf::json::Buffer {
+            byte_length: buffer.len() as u32,
+            extensions: Default::default(),
+            extras: Default::default(),
+            name: None,
+            uri: None,
+        }],
+        buffer_views: vec![
+            gltf::json::buffer::View {
+                buffer: gltf::json::Index::new(0),
+                byte_length: vertices_bytes.len() as u32,
+                byte_offset: None,
+                byte_stride: Some(std::mem::size_of::<Vertex>() as u32),
                 extensions: Default::default(),
                 extras: Default::default(),
                 name: None,
-                uri: None,
+                target: Some(Checked::Valid(gltf::json::buffer::Target::ArrayBuffer)),
+            },
+            gltf::json::buffer::View {
+                buffer: gltf::json::Index::new(0),
+                byte_length: indices_bytes.len() as u32,
+                byte_offset: Some(vertices_bytes.len() as u32),
+                byte_stride: None,
+                extensions: Default::default(),
+                extras: Default::default(),
+                name: None,
+                target: Some(Checked::Valid(
+                    gltf::json::buffer::Target::ElementArrayBuffer,
+                )),
+            },
+        ],
+        meshes: vec![gltf::json::Mesh {
+            extensions: Default::default(),
+            extras: Default::default(),
+            name: None,
+            primitives: vec![gltf::json::mesh::Primitive {
+                attributes: {
+                    let mut map = BTreeMap::new();
+                    map.insert(
+                        Checked::Valid(gltf::json::mesh::Semantic::Positions),
+                        gltf::json::Index::new(0),
+                    );
+                    map.insert(
+                        Checked::Valid(gltf::json::mesh::Semantic::Colors(0)),
+                        gltf::json::Index::new(1),
+                    );
+                    map
+                },
+                extensions: Default::default(),
+                extras: Default::default(),
+                indices: Some(gltf::json::Index::new(2)),
+                material: None,
+                mode: Checked::Valid(gltf::json::mesh::Mode::Triangles),
+                targets: None,
             }],
-            buffer_views: vec![
-                gltf::json::buffer::View {
-                    buffer: gltf::json::Index::new(0),
-                    byte_length: vertices_bytes.len() as u32,
-                    byte_offset: None,
-                    byte_stride: Some(std::mem::size_of::<Vertex>() as u32),
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    name: None,
-                    target: Some(Checked::Valid(gltf::json::buffer::Target::ArrayBuffer)),
-                },
-                gltf::json::buffer::View {
-                    buffer: gltf::json::Index::new(0),
-                    byte_length: indices_bytes.len() as u32,
-                    byte_offset: Some(vertices_bytes.len() as u32),
-                    byte_stride: None,
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    name: None,
-                    target: Some(Checked::Valid(gltf::json::buffer::Target::ElementArrayBuffer)),
-                },
-                ],
-                meshes: vec![gltf::json::Mesh {
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    name: None,
-                    primitives: vec![gltf::json::mesh::Primitive {
-                        attributes: {
-                            let mut map = BTreeMap::new();
-                            map.insert(Checked::Valid(gltf::json::mesh::Semantic::Positions), gltf::json::Index::new(0));
-                            map.insert(Checked::Valid(gltf::json::mesh::Semantic::Colors(0)), gltf::json::Index::new(1));
-                            map
-                        },
-                        extensions: Default::default(),
-                        extras: Default::default(),
-                        indices: Some(gltf::json::Index::new(2)),
-                        material: None,
-                        mode: Checked::Valid(gltf::json::mesh::Mode::Triangles),
-                        targets: None,
-                    }],
-                    weights: None,
-                }],
-                nodes: vec![gltf::json::Node {
-                    camera: None,
-                    children: None,
-                    extras: Default::default(),
-                    extensions: Default::default(),
-                    matrix: None,
-                    mesh: Some(gltf::json::Index::new(0)),
-                    name: None,
-                    rotation: None,
-                    scale: None,
-                    translation: None,
-                    skin: None,
-                    weights: None,
-                }],
-                scenes: vec![gltf::json::Scene {
-                    extensions: Default::default(),
-                    extras: Default::default(),
-                    name: None,
-                    nodes: vec![gltf::json::Index::new(0)],
-                }],
-                ..Default::default()
+            weights: None,
+        }],
+        nodes: vec![gltf::json::Node {
+            camera: None,
+            children: None,
+            extras: Default::default(),
+            extensions: Default::default(),
+            matrix: None,
+            mesh: Some(gltf::json::Index::new(0)),
+            name: None,
+            rotation: None,
+            scale: None,
+            translation: None,
+            skin: None,
+            weights: None,
+        }],
+        scenes: vec![gltf::json::Scene {
+            extensions: Default::default(),
+            extras: Default::default(),
+            name: None,
+            nodes: vec![gltf::json::Index::new(0)],
+        }],
+        ..Default::default()
     })?;
 
     Ok(gltf::binary::Glb {
@@ -331,7 +359,7 @@ fn to_glb<'a>(vertices: &[Vertex], indices: &[u32]) -> Result<gltf::binary::Glb<
 mod tests {
     use crate::color::Color;
 
-    use super::{Schematic, Vertex, remove_unused_vertices};
+    use super::{remove_unused_vertices, Schematic, Vertex};
 
     #[test]
     fn test_coordinates() {
@@ -361,13 +389,12 @@ mod tests {
         for x in 0..schem.x_size() {
             for y in 0..schem.y_size() {
                 for z in 0..schem.z_size() {
-                    let expected = if (1..=7).contains(&x) &&
-                                      (2..=8).contains(&y) &&
-                                      (3..=9).contains(&z) {
-                        Some(Color(1, 2, 3))
-                    } else {
-                        None
-                    };
+                    let expected =
+                        if (1..=7).contains(&x) && (2..=8).contains(&y) && (3..=9).contains(&z) {
+                            Some(Color(1, 2, 3))
+                        } else {
+                            None
+                        };
 
                     assert_eq!(schem.get(x, y, z).unwrap(), expected);
                 }
@@ -378,14 +405,29 @@ mod tests {
     #[test]
     fn test_remove_unused_vertices() {
         fn vert(n: f32) -> Vertex {
-            Vertex { pos: [n; 3], color: [n; 3] }
+            Vertex {
+                pos: [n; 3],
+                color: [n; 3],
+            }
         }
 
-        let vertices = vec![vert(0.), vert(1.), vert(2.), vert(3.), vert(4.), vert(5.), vert(6.), vert(7.)];
+        let vertices = vec![
+            vert(0.),
+            vert(1.),
+            vert(2.),
+            vert(3.),
+            vert(4.),
+            vert(5.),
+            vert(6.),
+            vert(7.),
+        ];
         let indices = vec![0, 1, 2, 2, 4, 0, 0, 7, 1];
         let (optimized_verts, optimized_inds) = remove_unused_vertices(&vertices, &indices);
-        
-        assert_eq!(optimized_verts, vec![vert(0.), vert(1.), vert(2.), vert(4.), vert(7.)]);
+
+        assert_eq!(
+            optimized_verts,
+            vec![vert(0.), vert(1.), vert(2.), vert(4.), vert(7.)]
+        );
         assert_eq!(optimized_inds, vec![0, 1, 2, 2, 3, 0, 0, 4, 1]);
     }
 }

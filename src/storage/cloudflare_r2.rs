@@ -1,6 +1,6 @@
 use rocket::async_trait;
 
-use crate::server::ObjectStorage;
+use super::ObjectStorage;
 
 pub struct CloudflareR2Storage {
     bucket: s3::Bucket,
@@ -14,16 +14,10 @@ impl CloudflareR2Storage {
         credentials: s3::creds::Credentials,
         public_url: String,
     ) -> Result<CloudflareR2Storage, s3::error::S3Error> {
-        let bucket = s3::Bucket::new(
-            bucket_name,
-            s3::Region::R2 { account_id },
-            credentials,
-        )?.with_path_style();
+        let bucket = s3::Bucket::new(bucket_name, s3::Region::R2 { account_id }, credentials)?
+            .with_path_style();
 
-        Ok(CloudflareR2Storage {
-            bucket,
-            public_url,
-        })
+        Ok(CloudflareR2Storage { bucket, public_url })
     }
 }
 
