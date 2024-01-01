@@ -1,8 +1,8 @@
 use std::time::Instant;
 
-use rocket::{routes, State, post, async_trait, http::Status};
 use crate::nlp;
 use crate::storage::ObjectStorage;
+use rocket::{http::Status, post, routes, State};
 
 struct Server {
     openai_api_key: String,
@@ -20,7 +20,9 @@ pub async fn run(
             object_storage,
         })
         .mount("/", routes![generate])
-        .launch().await.unwrap();
+        .launch()
+        .await
+        .unwrap();
 }
 
 #[post("/generate?<id>&<prompt>")]
@@ -30,11 +32,11 @@ async fn generate(server: &State<Server>, id: &str, prompt: &str) -> Result<Stri
         Ok(s) => {
             tracing::info!("built after {:?}", start.elapsed());
             s
-        },
+        }
         Err(e) => {
             tracing::error!("failed to generate build: {}", e);
-            return Err(Status::InternalServerError)
-        },
+            return Err(Status::InternalServerError);
+        }
     };
 
     let mut data = Vec::with_capacity(256);
@@ -42,8 +44,8 @@ async fn generate(server: &State<Server>, id: &str, prompt: &str) -> Result<Stri
         Ok(_) => tracing::info!("serialized after {:?}", start.elapsed()),
         Err(e) => {
             tracing::error!("failed to serialize build: {}", e);
-            return Err(Status::InternalServerError)
-        },
+            return Err(Status::InternalServerError);
+        }
     }
 
     match server.object_storage.put(id, &data).await {
@@ -51,6 +53,6 @@ async fn generate(server: &State<Server>, id: &str, prompt: &str) -> Result<Stri
         Err(e) => {
             tracing::error!("failed to store build: {}", e);
             Err(Status::InternalServerError)
-        },
+        }
     }
 }
