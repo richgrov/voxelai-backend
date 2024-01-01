@@ -2,11 +2,7 @@ use std::time::Instant;
 
 use rocket::{routes, State, post, async_trait, http::Status};
 use crate::nlp;
-
-#[async_trait]
-pub trait ObjectStorage: Send + Sync {
-    async fn put(&self, id: &str, data: &[u8]) -> Result<String, Box<dyn std::error::Error>>;
-}
+use crate::storage::ObjectStorage;
 
 struct Server {
     openai_api_key: String,
